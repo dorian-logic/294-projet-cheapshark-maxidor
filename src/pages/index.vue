@@ -1,7 +1,137 @@
+<!--
+  pages/index.vue
+
+  The home page (the only page of the app, shown at "/").
+
+  Its job is to "assemble" the screen:
+  - ask the store to load the deals when the page appears
+  - show the filter bar
+  - show the right state: loading, error, no results, or the list
+  - split the (possibly long) list into pages of DEALS_PER_PAGE cards
+
+  The filtering and sorting logic is NOT here: it lives in the store
+  (getter `filteredDeals`). The page only displays the result.
+-->
 <template>
-  <HelloWorld />
+  <v-container>
+    <h1 class="text-h4 font-weight-bold my-4">
+      Game deals
+    </h1>
+
+    <DealFilters class="mb-6" />
+
+    <!-- 1. LOADING: shown while the API download is in progress -->
+    <div v-if="dealsStore.loading" class="text-center py-12">
+      <v-progress-circular color="primary" indeterminate size="48" />
+      <p class="mt-4 text-medium-emphasis">
+        Loading deals...
+      </p>
+    </div>
+
+    <!-- 2. ERROR: the download failed. "Retry" calls the action again. -->
+    <v-alert
+      v-else-if="dealsStore.error"
+      title="Could not load the deals"
+      type="error"
+      variant="tonal"
+    >
+      {{ dealsStore.error }}
+      <template #append>
+        <v-btn variant="outlined" @click="dealsStore.loadDeals()">
+          Retry
+        </v-btn>
+      </template>
+    </v-alert>
+
+    <!-- 3. NO RESULTS: data is loaded, but no deal matches the filters -->
+    <v-alert
+      v-else-if="dealsStore.filteredDeals.length === 0"
+      title="No deal found"
+      type="info"
+      variant="tonal"
+    >
+      No deal matches your filters.
+      <template #append>
+        <v-btn variant="outlined" @click="dealsStore.resetFilters()">
+          Reset filters
+        </v-btn>
+      </template>
+    </v-alert>
+
+    <!-- 4. RESULTS -->
+    <template v-else>
+      <p class="mb-4 text-medium-emphasis">
+        {{ dealsStore.filteredDeals.length }} deal(s) found
+      </p>
+
+      <!-- Responsive grid: 1 card per row on phones, 2 on tablets,
+           3 on laptops, 4 on large screens (12 columns / cols value) -->
+      <v-row>
+        <v-col
+          v-for="deal in visibleDeals"
+          :key="deal.id"
+          cols="12"
+          lg="3"
+          md="4"
+          sm="6"
+        >
+          <DealCard
+            :deal="deal"
+            :store-logo="dealsStore.storeLogo(deal.store)"
+          />
+        </v-col>
+      </v-row>
+
+      <v-pagination
+        v-if="pageCount > 1"
+        v-model="currentPage"
+        class="my-6"
+        :length="pageCount"
+        :total-visible="7"
+      />
+    </template>
+  </v-container>
 </template>
 
 <script setup>
-  //
+  import { computed, onMounted, ref, watch } from 'vue'
+  import { useDealsStore } from '@/stores/deals'
+
+  const dealsStore = useDealsStore()
+
+  // How many cards are shown per page of results.
+  const DEALS_PER_PAGE = 24
+
+  // Page of results currently shown. This is purely visual (UI) state that
+  // only this page cares about, so it stays here and not in the store.
+  const currentPage = ref(1)
+
+  // Number of pages: 50 deals / 24 per page -> 2.08 -> rounded UP to 3.
+  const pageCount = computed(() =>
+    Math.ceil(dealsStore.filteredDeals.length / DEALS_PER_PAGE),
+  )
+
+  // Only the deals of the current page.
+  // Page 1 -> items 0 to 23, page 2 -> items 24 to 47, etc.
+  // slice(start, end) returns a copy and does not include `end`.
+  const visibleDeals = computed(() => {
+    const start = (currentPage.value - 1) * DEALS_PER_PAGE
+    return dealsStore.filteredDeals.slice(start, start + DEALS_PER_PAGE)
+  })
+
+  // When ANY filter changes, go back to page 1. Otherwise a user on page 5
+  // who searches for a game with only 3 results would see an empty page.
+  // `deep: true` = also react to changes INSIDE the filters object.
+  watch(
+    () => dealsStore.filters,
+    () => {
+      currentPage.value = 1
+    },
+    { deep: true },
+  )
+
+  // onMounted runs once, when the page is displayed for the first time.
+  onMounted(() => {
+    dealsStore.loadDeals()
+  })
 </script>
