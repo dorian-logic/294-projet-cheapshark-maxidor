@@ -1,4 +1,7 @@
-# How the app works — step 1 (deal list, filters, sorting)
+# How the app works
+
+- Step 1: deal list, filters, sorting
+- Step 2: detail view, offline fallback, keyboard access (see section 7)
 
 This document explains the **logic and the reasons** behind the code, so that
 every part can be explained and defended. The code itself is commented line
@@ -49,12 +52,16 @@ Things the API **cannot** do, and which shaped the design:
 src/
 ├── services/api.js         Talks to the API (axios). Nothing else does.
 ├── stores/deals.js         Pinia store: the data + filters + filtering/sorting logic
+├── data/fallback-data.json Saved sample deals, shown when the API is down
+├── utils/format.js         Price/date formatting shared by several components
 ├── components/
 │   ├── DealFilters.vue     The filter bar (writes into the store)
-│   ├── DealCard.vue        One deal card (receives a deal via props)
+│   ├── DealCard.vue        One deal card (props in, `select` event out)
+│   ├── DealDetailDialog.vue  Detail view of one deal (props in, events out)
 │   └── AppFooter.vue       Footer
 ├── layouts/default.vue     Top bar + <router-view> + footer around the page
-└── pages/index.vue         The only page: loading / error / empty / list + pagination
+└── pages/index.vue         The only page: loading / error / empty / list + pagination + dialog
+scripts/update-fallback.mjs Node script that refreshes the fallback data from the API
 ```
 
 Each layer has **one responsibility** ("separation of concerns"):
@@ -175,10 +182,11 @@ No function is called by hand to "apply" the filters: this is Vue's
   from → reusable anywhere.
 - Props are declared with `type` and `required`, so Vue warns in the console
   if they are used wrongly.
-- `Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })` is the
+- Prices and dates are formatted by `utils/format.js` (since step 2):
+  `Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })` is the
   built-in JavaScript way to format money (`4.99` → `$4.99`).
 - `v-if` on each score chip: no chip when the API didn't provide the value.
-- `releaseDate?.slice(0, 4)`: `?.` (optional chaining) stops and returns
+- `formatYear()` uses `isoDate?.slice(0, 4)`: `?.` (optional chaining) stops and returns
   `undefined` instead of crashing when `releaseDate` is missing.
 
 ### `pages/index.vue`
@@ -245,3 +253,112 @@ npm run dev                 # http://localhost:3000
 Note: `npm run lint` reports 5 "import order" errors in files from the
 Vuetify template (`main.js`, `plugins/`, `router/`). They existed before this
 step; `npm run lint` fixes them automatically (it runs with `--fix`).
+
+---
+
+## 7. Step 2: detail view, offline fallback, keyboard access
+
+### Detail view (`DealDetailDialog.vue`)
+
+**Why a dialog instead of a page?** The app has no routing. A dialog keeps the
+list, the filters and the scroll position untouched when it closes.
+
+**How it opens and closes**, the whole chain:
+
+```
+user clicks a card
+  └─> DealCard emits  select(deal)                 (child -> parent: EVENT)
+        └─> index.vue: selectedDeal = deal
+              └─> <DealDetailDialog :deal="selectedDeal">   (parent -> child: PROP)
+                    └─> v-dialog :model-value="deal !== null"  -> open
+
+user presses Escape / clicks outside / "Close"
+  └─> dialog emits close
+        └─> index.vue: selectedDeal = null  -> deal !== null is false -> closed
+```
+
+There is **one** source of truth, `selectedDeal`. There's no separate
+`isDialogOpen` boolean, so "open but no deal" or "closed but a deal selected"
+cannot happen.
+
+**Props down, events up.** `DealCard` and `DealDetailDialog` never change the
+page's data themselves: they *emit events* (`select`, `close`, `show-store`) and
+the page decides what to do. That keeps the components reusable and puts all
+decisions in one place (the page).
+
+**"All deals from <store>"** emits `show-store(name)`. The page sets
+`dealsStore.filters.store = name`, closes the dialog and scrolls up. The list
+updates by itself, because `filteredDeals` depends on `filters`.
+
+**Why not call `GET /deals/:id` when opening the dialog?** The list already
+contains every field the API has for that deal. A second request would return
+the same data, cost a network round-trip, and add a loading state for nothing.
+
+**Calculated values.** The API gives the discount in %, so the amount saved is
+computed: `normalPrice - salePrice`. Score bar colours: ≥ 75 green, ≥ 50
+orange, otherwise red.
+
+**`utils/format.js`.** Card and dialog both format prices and dates, so the
+formatting lives in one file of *pure functions* (same input → same output, no
+side effects) instead of being copy-pasted (DRY: Don't Repeat Yourself).
+`timeZone: 'UTC'` in the date formatter: `new Date('2023-11-14')` means midnight
+UTC; without it a browser in America would display November 13.
+
+### Offline fallback
+
+**Goal:** if the API is unreachable, the user still sees something useful
+instead of an error page.
+
+- `src/data/fallback-data.json` holds 17 real deals and the 14 stores, with the
+  date they were saved (`savedAt`).
+- It's imported with a normal `import` in the store. Vite **bundles it into the
+  app at build time**, so it's available even with no network at all.
+- In `loadDeals()`, the `catch` block now also does:
+  `deals = fallbackData.deals`, `stores = fallbackData.stores`,
+  `usingFallback = true`.
+- The page shows an orange warning **above** the list (not instead of it):
+  why, how old the data is, and a **Retry** button.
+- **Retry** calls `loadDeals()` again. The guard at the top was changed to
+  `if (deals.length > 0 && !usingFallback) return`. Otherwise "we already have
+  data" (the sample data) would block the retry.
+- In fallback mode the images and logos can't load (they're on the API's
+  server too). The cards show a gamepad icon (`<template #error>` of `v-img`)
+  and `storeLogo` returns no logo.
+
+**Refreshing the sample data:** `npm run update-fallback` runs
+`scripts/update-fallback.mjs` **in Node, not in the browser**. It downloads the
+first 24 deals and the stores and rewrites the JSON with today's date. It uses
+`fetch`, which is built into Node 18+. Unlike axios, `fetch` doesn't throw on
+HTTP errors, so the script checks `response.ok` itself.
+
+### Keyboard access
+
+Vuetify makes a `v-card` with `@click` clickable with the mouse, but **not**
+with the keyboard (you can't reach it with Tab). `DealCard` adds:
+
+| Attribute | Effect |
+|---|---|
+| `tabindex="0"` | the card can be reached with Tab |
+| `role="button"` | screen readers announce it as a button |
+| `aria-label` | screen readers read "Show details for <title>" |
+| `@keydown.enter` / `@keydown.space.prevent` | the keys open the details, like a real button (`.prevent` stops Space from scrolling the page) |
+
+The dialog itself closes with **Escape** (built into `v-dialog`).
+
+### Questions a teacher might ask (step 2)
+
+**Why does `DealCard` emit an event instead of opening the dialog itself?**
+The card doesn't know (and shouldn't know) what clicking means in each place it
+is used. The parent decides. That is the "props down, events up" rule.
+
+**Where should `selectedDeal` live: page or store?** Page. Only this page uses
+it, and it's temporary UI state. The store holds data shared by several
+components.
+
+**What if the fallback file is empty too?** The page still has the red
+"Could not load the deals" state (`error && deals.length === 0`).
+
+**Is the fallback data accurate?** It's a copy of real API data on the date in
+`savedAt`, and the app says so in the warning. `npm run update-fallback`
+refreshes it.
+

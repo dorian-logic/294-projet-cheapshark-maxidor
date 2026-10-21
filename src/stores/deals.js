@@ -17,6 +17,7 @@
  */
 
 import { defineStore } from 'pinia'
+import fallbackData from '@/data/fallback-data.json'
 import { fetchAllDeals, fetchStores, toImageUrl } from '@/services/api'
 
 /**
@@ -90,10 +91,14 @@ export const useDealsStore = defineStore('deals', {
     stores: [], // every store (used for the logos)
     loading: false, // true while the download is in progress
     error: null, // message to show if the download failed, otherwise null
+    usingFallback: false, // true when we show the saved sample data instead of the API's
     filters: createDefaultFilters(),
   }),
 
   getters: {
+    /** Date at which the fallback sample data was saved (shown in the warning). */
+    fallbackSavedAt: () => fallbackData.savedAt,
+
     /**
      * Names of the stores that actually have deals, sorted A-Z.
      * Used to fill the "Store" dropdown. A Set removes duplicates,
@@ -107,6 +112,11 @@ export const useDealsStore = defineStore('deals', {
      * that takes a parameter.
      */
     storeLogo: state => storeName => {
+      // The logos are hosted on the API's server: if we are in fallback mode,
+      // that server is unreachable, so return no logo instead of a broken image.
+      if (state.usingFallback) {
+        return ''
+      }
       const store = state.stores.find(s => s.name === storeName)
       return store ? toImageUrl(store.image) : ''
     },
@@ -152,8 +162,9 @@ export const useDealsStore = defineStore('deals', {
      * Called by the page when it appears on screen.
      */
     async loadDeals () {
-      // Already loaded: no need to download everything again.
-      if (this.deals.length > 0) {
+      // Already loaded from the API: no need to download everything again.
+      // (If we are showing the fallback data, we DO try again: that's "Retry".)
+      if (this.deals.length > 0 && !this.usingFallback) {
         return
       }
 
@@ -165,6 +176,7 @@ export const useDealsStore = defineStore('deals', {
         const [deals, stores] = await Promise.all([fetchAllDeals(), fetchStores()])
         this.deals = deals
         this.stores = stores
+        this.usingFallback = false
       } catch (error) {
         // Full details in the browser console for us developers...
         console.error('Failed to load deals:', error)
@@ -175,6 +187,14 @@ export const useDealsStore = defineStore('deals', {
         this.error = error.response
           ? `The deals API answered with an error (HTTP ${error.response.status}).`
           : 'The deals API could not be reached. Check your internet connection.'
+
+        // FALLBACK: instead of an empty page, show the sample deals saved in
+        // src/data/fallback-data.json. They are bundled with the app at build
+        // time, so they are always available, even without network.
+        // The page sees `usingFallback` and warns the user that the data is old.
+        this.deals = fallbackData.deals
+        this.stores = fallbackData.stores
+        this.usingFallback = true
       } finally {
         // `finally` runs in both cases (success or error),
         // so the loading indicator always disappears.
