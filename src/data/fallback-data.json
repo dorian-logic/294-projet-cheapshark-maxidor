@@ -1,0 +1,308 @@
+{
+  "savedAt": "2026-10-20",
+  "deals": [
+    {
+      "id": 1,
+      "title": "Astral Ascent",
+      "store": "Epic Games Store",
+      "salePrice": 0,
+      "normalPrice": 24.99,
+      "savings": 100,
+      "metacriticScore": 86,
+      "steamRatingPercent": 95,
+      "steamRatingText": "Overwhelmingly Positive",
+      "dealRating": 10,
+      "releaseDate": "2023-11-14",
+      "image": "/images/cheapshark/deals/1.webp"
+    },
+    {
+      "id": 2,
+      "title": "Breathedge 2",
+      "store": "Steam",
+      "salePrice": 15.71,
+      "normalPrice": 38.23,
+      "savings": 58.9,
+      "steamRatingPercent": 85,
+      "steamRatingText": "Very Positive",
+      "dealRating": 10,
+      "releaseDate": "2026-08-31",
+      "image": "/images/cheapshark/deals/2.webp"
+    },
+    {
+      "id": 3,
+      "title": "LUFTRAUSERS",
+      "store": "Epic Games Store",
+      "salePrice": 0,
+      "normalPrice": 9.99,
+      "savings": 100,
+      "metacriticScore": 80,
+      "steamRatingPercent": 91,
+      "steamRatingText": "Very Positive",
+      "dealRating": 10,
+      "releaseDate": "2014-03-18",
+      "image": "/images/cheapshark/deals/3.webp"
+    },
+    {
+      "id": 4,
+      "title": "The Crust",
+      "store": "Steam",
+      "salePrice": 20.79,
+      "normalPrice": 31.99,
+      "savings": 35,
+      "steamRatingPercent": 76,
+      "steamRatingText": "Mostly Positive",
+      "dealRating": 10,
+      "releaseDate": "2026-09-10",
+      "image": "/images/cheapshark/deals/4.webp"
+    },
+    {
+      "id": 5,
+      "title": "Seafarer: The Ship Sim",
+      "store": "Steam",
+      "salePrice": 20.99,
+      "normalPrice": 34.99,
+      "savings": 40,
+      "steamRatingPercent": 64,
+      "steamRatingText": "Mixed",
+      "dealRating": 10,
+      "releaseDate": "2026-09-24",
+      "image": "/images/cheapshark/deals/5.webp"
+    },
+    {
+      "id": 6,
+      "title": "Suicide Squad: Kill the Justice League",
+      "store": "Epic Games Store",
+      "salePrice": 3.49,
+      "normalPrice": 69.99,
+      "savings": 95,
+      "metacriticScore": 63,
+      "steamRatingPercent": 62,
+      "steamRatingText": "Mixed",
+      "dealRating": 10,
+      "releaseDate": "2024-02-02",
+      "image": "/images/cheapshark/deals/6.webp"
+    },
+    {
+      "id": 7,
+      "title": "EA SPORTS PGA TOUR",
+      "store": "Epic Games Store",
+      "salePrice": 6.99,
+      "normalPrice": 69.99,
+      "savings": 90,
+      "metacriticScore": 72,
+      "steamRatingPercent": 55,
+      "steamRatingText": "Mixed",
+      "dealRating": 10,
+      "releaseDate": "2023-04-06",
+      "image": "/images/cheapshark/deals/7.webp"
+    },
+    {
+      "id": 49,
+      "title": "BioShock Infinite",
+      "store": "GreenManGaming",
+      "salePrice": 6.75,
+      "normalPrice": 29.99,
+      "savings": 77.5,
+      "metacriticScore": 94,
+      "steamRatingPercent": 91,
+      "steamRatingText": "Very Positive",
+      "dealRating": 9.7,
+      "releaseDate": "2013-03-25",
+      "image": "/images/cheapshark/deals/49.webp"
+    },
+    {
+      "id": 50,
+      "title": "Honeycomb: The World Beyond",
+      "store": "Steam",
+      "salePrice": 25.18,
+      "normalPrice": 49.48,
+      "savings": 49.1,
+      "steamRatingPercent": 61,
+      "steamRatingText": "Mixed",
+      "dealRating": 9.7,
+      "releaseDate": "2026-09-08",
+      "image": "/images/cheapshark/deals/50.webp"
+    },
+    {
+      "id": 51,
+      "title": "Mindcop",
+      "store": "IndieGala",
+      "salePrice": 1.49,
+      "normalPrice": 14.99,
+      "savings": 90.1,
+      "metacriticScore": 87,
+      "steamRatingPercent": 94,
+      "steamRatingText": "Very Positive",
+      "dealRating": 9.7,
+      "releaseDate": "2024-11-14",
+      "image": "/images/cheapshark/deals/51.webp"
+    },
+    {
+      "id": 52,
+      "title": "Last Stop",
+      "store": "GameBillet",
+      "salePrice": 3.85,
+      "normalPrice": 24.99,
+      "savings": 84.6,
+      "steamRatingPercent": 77,
+      "steamRatingText": "Mostly Positive",
+      "dealRating": 9.6,
+      "releaseDate": "2026-09-30",
+      "image": "/images/cheapshark/deals/52.webp"
+    },
+    {
+      "id": 53,
+      "title": "Alan Wake",
+      "store": "GOG",
+      "salePrice": 1.49,
+      "normalPrice": 14.99,
+      "savings": 90.1,
+      "metacriticScore": 83,
+      "steamRatingPercent": 88,
+      "steamRatingText": "Very Positive",
+      "dealRating": 9.6,
+      "releaseDate": "2012-02-16",
+      "image": "/images/cheapshark/deals/53.webp"
+    },
+    {
+      "id": 54,
+      "title": "Watch_Dogs 2",
+      "store": "Humble Store",
+      "salePrice": 2.49,
+      "normalPrice": 49.99,
+      "savings": 95,
+      "metacriticScore": 75,
+      "steamRatingPercent": 81,
+      "steamRatingText": "Very Positive",
+      "dealRating": 9.6,
+      "releaseDate": "2016-11-28",
+      "image": "/images/cheapshark/deals/54.webp"
+    },
+    {
+      "id": 55,
+      "title": "Deus Ex: Human Revolution - Director's Cut",
+      "store": "DreamGame",
+      "salePrice": 3,
+      "normalPrice": 19.99,
+      "savings": 85,
+      "metacriticScore": 91,
+      "steamRatingPercent": 91,
+      "steamRatingText": "Very Positive",
+      "dealRating": 9.6,
+      "releaseDate": "2013-10-22",
+      "image": "/images/cheapshark/deals/55.webp"
+    },
+    {
+      "id": 57,
+      "title": "Deus Ex: Mankind Divided",
+      "store": "GOG",
+      "salePrice": 2.99,
+      "normalPrice": 29.99,
+      "savings": 90,
+      "metacriticScore": 83,
+      "steamRatingPercent": 75,
+      "steamRatingText": "Mostly Positive",
+      "dealRating": 9.6,
+      "releaseDate": "2016-08-23",
+      "image": "/images/cheapshark/deals/57.webp"
+    },
+    {
+      "id": 59,
+      "title": "Borderlands 3",
+      "store": "GreenManGaming",
+      "salePrice": 5.4,
+      "normalPrice": 59.99,
+      "savings": 91,
+      "metacriticScore": 81,
+      "steamRatingPercent": 81,
+      "steamRatingText": "Very Positive",
+      "dealRating": 9.5,
+      "releaseDate": "2019-09-13",
+      "image": "/images/cheapshark/deals/59.webp"
+    },
+    {
+      "id": 60,
+      "title": "Destiny 2: Beyond Light",
+      "store": "GameBillet",
+      "salePrice": 0.84,
+      "normalPrice": 19.99,
+      "savings": 95.8,
+      "metacriticScore": 73,
+      "dealRating": 9.5,
+      "releaseDate": "2020-11-10",
+      "image": "/images/cheapshark/deals/60.webp"
+    }
+  ],
+  "stores": [
+    {
+      "id": 1,
+      "name": "Steam",
+      "image": "/images/cheapshark/stores/1.webp"
+    },
+    {
+      "id": 2,
+      "name": "GamersGate",
+      "image": "/images/cheapshark/stores/2.webp"
+    },
+    {
+      "id": 3,
+      "name": "GreenManGaming",
+      "image": "/images/cheapshark/stores/3.webp"
+    },
+    {
+      "id": 4,
+      "name": "GOG",
+      "image": "/images/cheapshark/stores/4.webp"
+    },
+    {
+      "id": 5,
+      "name": "Humble Store",
+      "image": "/images/cheapshark/stores/5.webp"
+    },
+    {
+      "id": 6,
+      "name": "Uplay",
+      "image": "/images/cheapshark/stores/6.webp"
+    },
+    {
+      "id": 7,
+      "name": "Fanatical",
+      "image": "/images/cheapshark/stores/7.webp"
+    },
+    {
+      "id": 8,
+      "name": "WinGameStore",
+      "image": "/images/cheapshark/stores/8.webp"
+    },
+    {
+      "id": 9,
+      "name": "GameBillet",
+      "image": "/images/cheapshark/stores/9.webp"
+    },
+    {
+      "id": 10,
+      "name": "Epic Games Store",
+      "image": "/images/cheapshark/stores/10.webp"
+    },
+    {
+      "id": 11,
+      "name": "Gamesplanet",
+      "image": "/images/cheapshark/stores/11.webp"
+    },
+    {
+      "id": 12,
+      "name": "Gamesload",
+      "image": "/images/cheapshark/stores/12.webp"
+    },
+    {
+      "id": 13,
+      "name": "IndieGala",
+      "image": "/images/cheapshark/stores/13.webp"
+    },
+    {
+      "id": 14,
+      "name": "DreamGame",
+      "image": "/images/cheapshark/stores/14.webp"
+    }
+  ]
+}
