@@ -92,10 +92,20 @@ export const useDealsStore = defineStore('deals', {
     loading: false, // true while the download is in progress
     error: null, // message to show if the download failed, otherwise null
     usingFallback: false, // true when we show the saved sample data instead of the API's
+    // Page of results shown in the list. It lives in the store (not in the
+    // list page) so it SURVIVES navigation: open a deal, press Back, and you
+    // are still on the same page of results.
+    currentPage: 1,
     filters: createDefaultFilters(),
   }),
 
   getters: {
+    /**
+     * Returns a function: dealById(12) -> the deal with id 12, or undefined.
+     * Used by the detail page, which only knows the id (from the URL).
+     */
+    dealById: state => id => state.deals.find(deal => deal.id === id),
+
     /** Date at which the fallback sample data was saved (shown in the warning). */
     fallbackSavedAt: () => fallbackData.savedAt,
 
@@ -167,6 +177,11 @@ export const useDealsStore = defineStore('deals', {
       if (this.deals.length > 0 && !this.usingFallback) {
         return
       }
+      // A download is already running (e.g. the list page and the detail page
+      // both asked for the data): don't start a second one in parallel.
+      if (this.loading) {
+        return
+      }
 
       this.loading = true
       this.error = null
@@ -205,6 +220,15 @@ export const useDealsStore = defineStore('deals', {
     /** Puts every filter back to its default value. */
     resetFilters () {
       this.filters = createDefaultFilters()
+    },
+
+    /**
+     * Shows only the deals of one store, starting from the first page.
+     * Used by the detail page's "All deals from <store>" button.
+     */
+    filterByStore (storeName) {
+      this.filters.store = storeName
+      this.currentPage = 1
     },
   },
 })

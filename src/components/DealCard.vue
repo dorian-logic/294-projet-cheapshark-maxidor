@@ -2,30 +2,23 @@
   DealCard.vue
 
   Displays ONE deal as a card: image, title, store, prices and scores.
+  Clicking the card opens the deal's detail page (/deals/<id>).
 
   This is a "presentational" component: it does not fetch or change any
-  data. It receives a deal through its props and shows it. When the user
-  clicks it, it doesn't decide what happens: it only EMITS a `select` event
-  and lets the parent decide (here: the page opens the detail dialog).
+  data. It receives a deal through its props and shows it.
 
-  Usage: <DealCard :deal="deal" :store-logo="url" @select="openDetail" />
+  Usage: <DealCard :deal="deal" :store-logo="url" />
   (Components in src/components are auto-imported, no `import` needed.)
 -->
 <template>
-  <!-- @click makes the card clickable with the mouse (hover effect, ripple).
-       Vuetify does NOT make it usable with the keyboard, so we add it ourselves:
-       - tabindex="0"   -> the card can be reached with the Tab key
-       - role="button"  -> screen readers announce it as a button
-       - Enter / Space  -> open the details, like a real button
-         (.prevent stops Space from also scrolling the page) -->
+  <!-- `to` turns the card into a router LINK (an <a> element):
+       - clicking it navigates to /deals/<id> without reloading the page
+       - it works with the keyboard (Tab, then Enter), like any link
+       - Ctrl+click / middle-click opens the deal in a new tab
+       - the browser's Back button returns to the list -->
   <v-card
-    :aria-label="`Show details for ${deal.title}`"
     class="h-100 d-flex flex-column"
-    role="button"
-    tabindex="0"
-    @click="emit('select', deal)"
-    @keydown.enter="emit('select', deal)"
-    @keydown.space.prevent="emit('select', deal)"
+    :to="`/deals/${deal.id}`"
   >
     <v-img
       :alt="deal.title"
@@ -126,10 +119,6 @@
       default: '',
     },
   })
-
-  // Emits = the events this component can SEND to its parent.
-  // Data goes down through props, events go up through emits.
-  const emit = defineEmits(['select'])
 
   // `computed` values are recalculated only when the props they use change.
   const imageUrl = computed(() => toImageUrl(props.deal.image))

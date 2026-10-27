@@ -12,6 +12,15 @@ import { routes } from 'vue-router/auto-routes'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: setupLayouts(routes),
+
+  // Decides where the page scrolls after each navigation.
+  // - savedPosition exists when the user used the browser's Back/Forward
+  //   buttons (or router.back()): we return to where they were, so going back
+  //   from a deal lands on the same card in the list.
+  // - Otherwise (a normal link click) we start at the top of the new page.
+  scrollBehavior (to, from, savedPosition) {
+    return savedPosition ?? { top: 0 }
+  },
 })
 
 // Workaround for https://github.com/vitejs/vite/issues/11804

@@ -1,7 +1,11 @@
 # How the app works
 
-- Step 1: deal list, filters, sorting
-- Step 2: detail view, offline fallback, keyboard access (see section 7)
+- Step 1: deal list, filters, sorting (sections 1-6)
+- Step 2: offline fallback, shared formatting (section 7)
+- Step 3: Vue Router, one page per deal, 404 page (section 8)
+
+(Step 2 first showed the details in a dialog. Step 3 replaced it with a real
+page per deal, as recommended in class.)
 
 This document explains the **logic and the reasons** behind the code, so that
 every part can be explained and defended. The code itself is commented line
@@ -56,11 +60,14 @@ src/
 ├── utils/format.js         Price/date formatting shared by several components
 ├── components/
 │   ├── DealFilters.vue     The filter bar (writes into the store)
-│   ├── DealCard.vue        One deal card (props in, `select` event out)
-│   ├── DealDetailDialog.vue  Detail view of one deal (props in, events out)
+│   ├── DealCard.vue        One deal card (props in), a link to its detail page
 │   └── AppFooter.vue       Footer
-├── layouts/default.vue     Top bar + <router-view> + footer around the page
-└── pages/index.vue         The only page: loading / error / empty / list + pagination + dialog
+├── layouts/default.vue     Top bar + <router-view> + footer around every page
+├── router/index.js         Creates the router (routes generated from src/pages/)
+└── pages/                  One file = one page (file-based routing)
+    ├── index.vue           "/"            the list: loading / error / empty / cards + pagination
+    ├── deals/[id].vue      "/deals/:id"   the detail page of one deal
+    └── [...path].vue       anything else  "Page not found" (404)
 scripts/update-fallback.mjs Node script that refreshes the fallback data from the API
 ```
 
@@ -199,8 +206,9 @@ No function is called by hand to "apply" the filters: this is Vue's
   - `pageCount = Math.ceil(total / 24)` (rounded **up**: 25 deals = 2 pages).
   - `visibleDeals = filteredDeals.slice(start, start + 24)` with
     `start = (page - 1) * 24`.
-  - `currentPage` lives in the page, not the store: it's purely visual state
-    nobody else needs.
+  - `currentPage` lives in the **store** (since step 3): the list page is
+    destroyed when you open a deal, so a local variable would reset to page 1
+    every time you come back.
 - **`watch(() => dealsStore.filters, ..., { deep: true })`** goes back to
   page 1 whenever a filter changes, otherwise you could be on page 5 of a
   result that only has 1 page. `deep: true` = also detect changes *inside* the
@@ -256,53 +264,7 @@ step; `npm run lint` fixes them automatically (it runs with `--fix`).
 
 ---
 
-## 7. Step 2: detail view, offline fallback, keyboard access
-
-### Detail view (`DealDetailDialog.vue`)
-
-**Why a dialog instead of a page?** The app has no routing. A dialog keeps the
-list, the filters and the scroll position untouched when it closes.
-
-**How it opens and closes**, the whole chain:
-
-```
-user clicks a card
-  └─> DealCard emits  select(deal)                 (child -> parent: EVENT)
-        └─> index.vue: selectedDeal = deal
-              └─> <DealDetailDialog :deal="selectedDeal">   (parent -> child: PROP)
-                    └─> v-dialog :model-value="deal !== null"  -> open
-
-user presses Escape / clicks outside / "Close"
-  └─> dialog emits close
-        └─> index.vue: selectedDeal = null  -> deal !== null is false -> closed
-```
-
-There is **one** source of truth, `selectedDeal`. There's no separate
-`isDialogOpen` boolean, so "open but no deal" or "closed but a deal selected"
-cannot happen.
-
-**Props down, events up.** `DealCard` and `DealDetailDialog` never change the
-page's data themselves: they *emit events* (`select`, `close`, `show-store`) and
-the page decides what to do. That keeps the components reusable and puts all
-decisions in one place (the page).
-
-**"All deals from <store>"** emits `show-store(name)`. The page sets
-`dealsStore.filters.store = name`, closes the dialog and scrolls up. The list
-updates by itself, because `filteredDeals` depends on `filters`.
-
-**Why not call `GET /deals/:id` when opening the dialog?** The list already
-contains every field the API has for that deal. A second request would return
-the same data, cost a network round-trip, and add a loading state for nothing.
-
-**Calculated values.** The API gives the discount in %, so the amount saved is
-computed: `normalPrice - salePrice`. Score bar colours: ≥ 75 green, ≥ 50
-orange, otherwise red.
-
-**`utils/format.js`.** Card and dialog both format prices and dates, so the
-formatting lives in one file of *pure functions* (same input → same output, no
-side effects) instead of being copy-pasted (DRY: Don't Repeat Yourself).
-`timeZone: 'UTC'` in the date formatter: `new Date('2023-11-14')` means midnight
-UTC; without it a browser in America would display November 13.
+## 7. Step 2: offline fallback and shared formatting
 
 ### Offline fallback
 
@@ -313,16 +275,16 @@ instead of an error page.
   date they were saved (`savedAt`).
 - It's imported with a normal `import` in the store. Vite **bundles it into the
   app at build time**, so it's available even with no network at all.
-- In `loadDeals()`, the `catch` block now also does:
+- In `loadDeals()`, the `catch` block also does:
   `deals = fallbackData.deals`, `stores = fallbackData.stores`,
   `usingFallback = true`.
-- The page shows an orange warning **above** the list (not instead of it):
+- The list shows an orange warning **above** the cards (not instead of them):
   why, how old the data is, and a **Retry** button.
-- **Retry** calls `loadDeals()` again. The guard at the top was changed to
+- **Retry** calls `loadDeals()` again. The guard at the top is
   `if (deals.length > 0 && !usingFallback) return`. Otherwise "we already have
   data" (the sample data) would block the retry.
 - In fallback mode the images and logos can't load (they're on the API's
-  server too). The cards show a gamepad icon (`<template #error>` of `v-img`)
+  server too). Cards show a gamepad icon (`<template #error>` of `v-img`)
   and `storeLogo` returns no logo.
 
 **Refreshing the sample data:** `npm run update-fallback` runs
@@ -331,34 +293,163 @@ first 24 deals and the stores and rewrites the JSON with today's date. It uses
 `fetch`, which is built into Node 18+. Unlike axios, `fetch` doesn't throw on
 HTTP errors, so the script checks `response.ok` itself.
 
-### Keyboard access
+### `utils/format.js`
 
-Vuetify makes a `v-card` with `@click` clickable with the mouse, but **not**
-with the keyboard (you can't reach it with Tab). `DealCard` adds:
-
-| Attribute | Effect |
-|---|---|
-| `tabindex="0"` | the card can be reached with Tab |
-| `role="button"` | screen readers announce it as a button |
-| `aria-label` | screen readers read "Show details for <title>" |
-| `@keydown.enter` / `@keydown.space.prevent` | the keys open the details, like a real button (`.prevent` stops Space from scrolling the page) |
-
-The dialog itself closes with **Escape** (built into `v-dialog`).
+The card and the detail page both format prices and dates, so the formatting
+lives in one file of *pure functions* (same input → same output, no side
+effects) instead of being copy-pasted (DRY: Don't Repeat Yourself).
+`timeZone: 'UTC'` in the date formatter: `new Date('2023-11-14')` means midnight
+UTC; without it a browser in America would display November 13.
 
 ### Questions a teacher might ask (step 2)
 
-**Why does `DealCard` emit an event instead of opening the dialog itself?**
-The card doesn't know (and shouldn't know) what clicking means in each place it
-is used. The parent decides. That is the "props down, events up" rule.
-
-**Where should `selectedDeal` live: page or store?** Page. Only this page uses
-it, and it's temporary UI state. The store holds data shared by several
-components.
-
-**What if the fallback file is empty too?** The page still has the red
+**What if the fallback file is empty too?** The list still has the red
 "Could not load the deals" state (`error && deals.length === 0`).
 
 **Is the fallback data accurate?** It's a copy of real API data on the date in
 `savedAt`, and the app says so in the warning. `npm run update-fallback`
 refreshes it.
 
+---
+
+## 8. Step 3: Vue Router, one page per deal
+
+### Routes come from files
+
+The project uses **file-based routing** (`unplugin-vue-router`, set up by the
+Vuetify template). Nobody writes a list of routes by hand: every `.vue` file in
+`src/pages/` becomes a route.
+
+| File | URL | Shows |
+|---|---|---|
+| `pages/index.vue` | `/` | the deal list |
+| `pages/deals/[id].vue` | `/deals/12` | the deal with id 12 |
+| `pages/[...path].vue` | anything else | "Page not found" |
+
+- `[id]` = a **dynamic segment**: whatever is in that part of the URL is
+  available in the page as `route.params.id`.
+- `[...path]` = a **catch-all**: it matches every address. The router always
+  prefers the most specific route, so it's only used when nothing else matches.
+- `router/index.js` creates the router with these generated routes, and
+  `layouts/default.vue` contains `<router-view />`: the spot where the page
+  matching the current URL is displayed, between the top bar and the footer.
+- `typed-router.d.ts` is generated automatically when the dev server runs
+  (it lists the routes for autocompletion). Commit it, don't edit it.
+
+### From card to detail page
+
+`DealCard` is now a **link**: `<v-card :to="`/deals/${deal.id}`">`. Vuetify turns
+a card with `to` into a router link (an `<a href="/deals/12">` element):
+
+- clicking changes the URL and shows the detail page **without reloading** the
+  app (the store, and so the 500 deals, stay in memory);
+- it works with the keyboard (Tab, Enter) like any link, so the
+  `tabindex`/`role`/`@keydown` additions from step 2 are no longer needed;
+- Ctrl+click or middle-click opens the deal in a new tab;
+- the URL can be bookmarked or shared.
+
+The card no longer emits any event: it doesn't need the parent anymore, the
+URL carries the information ("show deal 12").
+
+### The detail page (`pages/deals/[id].vue`)
+
+```
+URL /deals/12
+  └─> route.params.id = "12"         (always TEXT)
+        └─> dealId = Number("12") = 12  (ids in the data are NUMBERS; 12 === "12" is false)
+              └─> deal = dealsStore.dealById(12)   (getter: deals.find(d => d.id === 12))
+```
+
+`deal` is a `computed`, which is the key to the **two ways to arrive** here:
+
+1. **From the list:** the deals are already in the store → `deal` is found
+   immediately.
+2. **Directly** (bookmark, shared link, F5 on the page): the app has just
+   started, the store is **empty**. `onMounted` calls `loadDeals()`, the page
+   shows a spinner (`dealsStore.loading`), and when the data arrives `deal`
+   recalculates **by itself** and the page appears. No `await`, no manual
+   refresh: reactivity does it.
+
+States of the page, in order: loading → offline and not in the sample data
+(Retry) → not found (`/deals/99999`, `/deals/abc`: `Number('abc')` is `NaN`,
+which matches nothing) → the deal.
+
+**Why not `GET /deals/:id`?** On a direct visit, loading the full list (5
+requests) means that when the user goes back to the list, it's already there,
+filters work, and there is one single way data enters the app
+(`loadDeals()`). Fetching only `/deals/12` would be lighter for that one page
+but would need a second loading path and a second set of states.
+
+**The store guard against double downloads:** `loadDeals()` now also returns
+early `if (this.loading)`. Without it, the list and detail page could both start
+a download at the same time.
+
+### Going back to the list
+
+The goal: when you come back from a deal, the list should be **exactly as you
+left it**: same filters, same page of results, same scroll position.
+
+| What | How it survives |
+|---|---|
+| Filters | already in the Pinia store, which lives as long as the app (not as long as a page) |
+| Page of results | `currentPage` **moved from the list page to the store** (the list component is destroyed when you open a deal, its local variables are lost) |
+| Scroll position | `scrollBehavior` in `router/index.js`: on Back/Forward the browser gives a `savedPosition` and we return to it; on a normal link click we go to the top |
+
+**"Back to deals" button:** `router.back()` acts exactly like the browser's Back
+button, so the scroll position is restored. But if the page was opened directly
+(nothing before it), going back would leave the app. Vue Router stores the
+previous address in `window.history.state.back`: if it exists → `router.back()`,
+otherwise → `router.push('/')`.
+
+**"All deals from <store>":** the store action `filterByStore(name)` sets the
+filter **and** puts `currentPage` back to 1 (the list's `watch` can't do it:
+the list page isn't mounted at that moment), then `router.push('/')`.
+
+The app title in the top bar is also a link to `/`.
+
+### History mode and hosting (Vercel)
+
+The router uses `createWebHistory`: clean URLs like `/deals/12`. That address
+doesn't exist as a file on the server: there's only `index.html` and the
+JavaScript. The app (Vue Router) is what understands `/deals/12`.
+
+- Clicking links inside the app is fine: the browser never asks the server.
+- But opening `/deals/12` directly or pressing F5 asks the **server** for that
+  path. `npm run dev` / `npm run preview` answer every path with the app, so it
+  works locally. **Vercel doesn't by default** and would show a 404.
+- `vercel.json` (project root) fixes it with a **rewrite**: any path that is
+  not a real file is answered with `index.html`, then Vue Router reads the URL
+  and shows the right page. Real files (JS, CSS, images) are still served
+  normally.
+
+```json
+{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }
+```
+
+(GitHub Pages can't do rewrites; there the alternative is
+`createWebHashHistory`, with URLs like `/#/deals/12`.)
+
+**Vercel deploys what is on GitHub**, not what is on your computer: commit
+**and push** to see changes online.
+
+### Questions a teacher might ask (step 3)
+
+**What's the difference between `useRoute()` and `useRouter()`?**
+`useRoute()` = the *current* location (path, `params`, `query`): you read it.
+`useRouter()` = the router object: you use it to *navigate* (`push`, `back`).
+
+**Why `Number(route.params.id)`?** URL parameters are always strings; the
+deal ids are numbers. `find(d => d.id === "12")` would never match.
+
+**What happens if I refresh on a deal page?** The whole app restarts, the
+store is empty, the page loads the deals itself and shows the deal (see "two
+ways to arrive").
+
+**Why is `currentPage` in the store now, when step 1 said UI state stays in the
+page?** The rule is "state lives where it needs to live". It was only needed
+by the list, but it also needs to **outlive** the list component, which is
+destroyed on navigation. The store outlives every page.
+
+**Why `push('/')` and not `back()` for "All deals from <store>"?** The user
+wants a *new* view of the list (filtered, page 1, top of the page), not to
+return to the previous one.
