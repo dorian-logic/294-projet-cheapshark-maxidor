@@ -4,6 +4,7 @@
 - Step 2: offline fallback, shared formatting (section 7)
 - Step 3: Vue Router, one page per deal, 404 page (section 8)
 - Step 4: names aligned with the course, styling (section 9)
+- Step 5: favorites with localStorage, store init() in App.vue (section 10)
 
 (Step 2 first showed the details in a dialog. Step 3 replaced it with a real
 page per deal, as recommended in class.)
@@ -90,8 +91,10 @@ components change.
 **At start-up**
 
 ```
-pages/index.vue  onMounted()
-   └─> dealsStore.fetchDeals()                (action)
+App.vue  onMounted()                         (since step 5; before: each page)
+   └─> dealsStore.init()
+         ├─> loadFavorites()                  (localStorage, instant)
+         └─> fetchDeals()                     (action)
          ├─> isLoading = true
          ├─> fetchAllDeals() + fetchStores()  (service, in parallel)
          │      └─> GET /deals?page=1 ... page=5, GET /stores
@@ -199,7 +202,8 @@ No function is called by hand to "apply" the filters: this is Vue's
 
 ### `pages/index.vue`
 
-- **`onMounted`** starts the loading when the page appears.
+- The deals are loaded by `dealsStore.init()` in `App.vue` (since step 5),
+  not by this page: the page only displays the store's state.
 - **Four exclusive states** with `v-if / v-else-if / v-else`: loading → error
   (with *Retry*) → no results (with *Reset filters*) → list. A user is
   never left in front of an empty screen without explanation.
@@ -366,7 +370,7 @@ URL /deals/12
 1. **From the list:** the deals are already in the store → `deal` is found
    immediately.
 2. **Directly** (bookmark, shared link, F5 on the page): the app has just
-   started, the store is **empty**. `onMounted` calls `fetchDeals()`, the page
+   started, the store is **empty**. `init()` in `App.vue` is loading it, the page
    shows a spinner (`dealsStore.isLoading`), and when the data arrives `deal`
    recalculates **by itself** and the page appears. No `await`, no manual
    refresh: reactivity does it.
@@ -382,8 +386,8 @@ filters work, and there is one single way data enters the app
 but would need a second loading path and a second set of states.
 
 **The store guard against double downloads:** `fetchDeals()` now also returns
-early `if (this.isLoading)`. Without it, the list and detail page could both start
-a download at the same time.
+early `if (this.isLoading)`. Without it, two callers (e.g. a Retry click during
+a running download) could start two downloads at the same time.
 
 ### Going back to the list
 
@@ -503,3 +507,122 @@ use the theme's colours, so everything adapts to both modes automatically.
   The full title is still visible on hover (`:title`) and on the detail page.
 - **`@media (prefers-reduced-motion: reduce)`**: users who asked their system
   for less motion get no animation (accessibility).
+
+---
+
+## 10. Step 5: favorites (course sequence 5)
+
+### The data: IDs in the store, copied to localStorage
+
+```
+state.favorites = [174, 15]                ← only the IDs
+        │  saveFavorites(): JSON.stringify
+        ▼
+localStorage["cheapshark-favorites"] = "[174,15]"   ← text, survives reloads
+        │  loadFavorites(): JSON.parse (in init(), at start-up)
+        ▼
+state.favorites = [174, 15]
+```
+
+**Why store IDs, not whole deals?** IDs are tiny, they never go out of date
+(the price shown always comes from the freshly loaded `deals`), and an array of
+numbers is easy to save as text.
+
+**localStorage** is a small key → text storage in the browser (~5 MB per site).
+It's synchronous, kept per browser (not shared between devices), readable by
+any script on the page (never put secrets in it), and not a database.
+It only stores **strings**, hence `JSON.stringify()` to save and
+`JSON.parse()` to read back.
+
+**The key `cheapshark-favorites`** is prefixed with the app's name because
+localStorage is shared by every page of the same site address (e.g. all apps
+on `localhost:3000`).
+
+**`loadFavorites()` is defensive:** nothing saved yet → keep `[]`; text that
+isn't valid JSON → `try/catch`, warn in the console and start empty; anything
+that isn't an array of numbers is ignored. A broken saved value can never crash
+the app.
+
+### The store
+
+| Part | Name | Role |
+|---|---|---|
+| state | `favorites` | array of deal IDs |
+| getter with parameter | `isFavorite(id)` | `true`/`false`: chooses the heart icon |
+| getter | `getFavorites` | IDs → full deal objects, for the favorites page |
+| action | `toggleFavorite(id)` | add if absent, remove if present, then save |
+| action | `saveFavorites()` | write to localStorage |
+| action | `loadFavorites()` | read from localStorage |
+| action | `init()` | `loadFavorites()` then `fetchDeals()`, called once in `App.vue` |
+
+**`getFavorites` filters out `undefined`:** `ids.map(id => deals.find(...))`
+gives `undefined` when a favorite's deal isn't in the current data (offline
+with only the sample deals, or no longer on sale). `.filter(Boolean)` removes
+those, so the page never tries to display `undefined`. The favorites page shows
+how many were hidden.
+
+**The toggle pattern:** one action, two effects. `isFavorite(id)` decides:
+already there → `filter()` keeps every ID except this one; not there →
+`push(id)`. Then `saveFavorites()`.
+
+### `init()` in App.vue
+
+`App.vue` is mounted once when the app starts and never destroyed, whatever
+page the user opens first. So it's the right place to prepare the store once:
+`onMounted(() => dealsStore.init())`. The pages no longer call
+`fetchDeals()` themselves; they only display the store's state (spinner while
+`isLoading`, then the data).
+
+### The heart button (`DealCard.vue`)
+
+The card is a **link** (`to="/deals/12"`) and the heart button is **inside**
+it. A click on the heart would normally also reach the link and open the deal.
+
+```html
+<v-btn @click.stop.prevent="dealsStore.toggleFavorite(deal.id)" />
+```
+
+- `.stop` = `event.stopPropagation()`: the click doesn't go up to the parent
+  elements (the card).
+- `.prevent` = `event.preventDefault()`: cancels the browser's default action,
+  here following the link (the button is inside an `<a>`).
+
+The card reads `dealsStore.isFavorite(deal.id)` in a `computed`: filled red
+heart or white outline, and an `aria-label` for screen readers ("Add to
+favorites" / "Remove from favorites"). When `favorites` changes in the store,
+every card showing that deal updates by itself.
+
+### The favorites page (`pages/favorites.vue` → `/favorites`)
+
+- Same grid and **same `DealCard`** as the home page (component reuse).
+- `v-if` / `v-else-if` / `v-else`: loading → "No favorites yet" (with a link
+  to the deals) → the cards.
+- Removing a favorite there makes the card disappear immediately: the page
+  displays `getFavorites`, which recalculates when `favorites` changes.
+
+### Navigation
+
+The top bar now has two buttons: **Deals** (`to="/"`, `exact` so it's only
+highlighted on `/` itself, since every path starts with `/`) and **Favorites**
+(`to="/favorites"`) with a `v-badge` showing how many favorites there are
+(hidden at 0). On phones only the icons are shown (`d-none d-sm-inline` on the
+text). The deal page also has an "Add to favorites" / "In favorites" button.
+
+### Questions a teacher might ask (step 5)
+
+**Why `@click.stop.prevent` and not just `@click`?** The button is inside a
+link: `@click` alone would add the favorite *and* open the deal page.
+
+**Difference between `.stop` and `.prevent`?** `.stop` stops the event from
+bubbling up to parent elements; `.prevent` cancels the browser's default
+behaviour for that event (following a link, submitting a form...).
+
+**Why `JSON.stringify` / `JSON.parse`?** localStorage only stores text.
+
+**Limits of localStorage?** ~5 MB, synchronous, per browser and device, not
+secure (any script on the page can read it), not a replacement for a database.
+
+**Why is `loadFavorites()` in `init()` and `init()` in `App.vue`?** The
+favorites must be loaded before any page displays hearts, whatever page the
+user opens first, and only once: `App.vue` is the only component that exists
+for the whole life of the app.

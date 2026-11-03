@@ -118,7 +118,7 @@
 </template>
 
 <script setup>
-  import { computed, onMounted, watch } from 'vue'
+  import { computed, watch } from 'vue'
   import { useDealsStore } from '@/stores/deals'
   import { formatDate } from '@/utils/format'
 
@@ -155,8 +155,6 @@
     { deep: true },
   )
 
-  // onMounted runs once, when the page is displayed for the first time.
-  onMounted(() => {
-    dealsStore.fetchDeals()
-  })
+  // No onMounted / fetchDeals() here: the deals are loaded once for the whole
+  // app by dealsStore.init(), called in App.vue.
 </script>

@@ -14,9 +14,9 @@
   1. The user clicked a card in the list: the deals are already in the store,
      so the deal is found instantly.
   2. The user opened /deals/12 directly (bookmark, shared link, refresh F5):
-     the app has just started and the store is EMPTY. The page then asks the
-     store to load the deals, shows a spinner, and displays the deal as soon
-     as the data arrives (the `deal` computed recalculates by itself).
+     the app has just started and the store is EMPTY. App.vue's init() is
+     downloading the deals: the page shows a spinner, and displays the deal as
+     soon as the data arrives (the `deal` computed recalculates by itself).
 -->
 <template>
   <v-container class="py-6" style="max-width: 1000px">
@@ -182,7 +182,17 @@
             </v-list>
           </v-card-text>
 
-          <v-card-actions>
+          <v-card-actions class="flex-wrap ga-2">
+            <!-- Same toggle as the heart on the cards: the icon, colour and
+                 text all depend on isFavorite(), so they switch by themselves -->
+            <v-btn
+              :color="dealsStore.isFavorite(deal.id) ? 'red' : undefined"
+              :prepend-icon="dealsStore.isFavorite(deal.id) ? 'mdi-heart' : 'mdi-heart-outline'"
+              variant="tonal"
+              @click="dealsStore.toggleFavorite(deal.id)"
+            >
+              {{ dealsStore.isFavorite(deal.id) ? 'In favorites' : 'Add to favorites' }}
+            </v-btn>
             <v-btn
               prepend-icon="mdi-storefront-outline"
               variant="tonal"
@@ -198,7 +208,7 @@
 </template>
 
 <script setup>
-  import { computed, onMounted } from 'vue'
+  import { computed } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import { toImageUrl } from '@/plugins/axios'
   import { useDealsStore } from '@/stores/deals'
@@ -261,10 +271,6 @@
     router.push('/')
   }
 
-  // Direct visit: the store is empty, so load the data.
-  // When coming from the list, fetchDeals() sees the data is already
-  // there and returns immediately (see the guard in the store).
-  onMounted(() => {
-    dealsStore.fetchDeals()
-  })
+  // No onMounted / fetchDeals() here: the deals are loaded once for the whole
+  // app by dealsStore.init() in App.vue, even on a direct visit to this page.
 </script>

@@ -4,8 +4,9 @@
   Displays ONE deal as a card: image, title, store, prices and scores.
   Clicking the card opens the deal's detail page (/deals/<id>).
 
-  This is a "presentational" component: it does not fetch or change any
-  data. It receives a deal through its props and shows it.
+  It receives the deal to show through its props. The only thing it changes
+  is the favorites (heart button), through the store, so the heart works the
+  same wherever the card is used (deal list AND favorites page).
 
   Usage: <DealCard :deal="deal" :store-logo="url" />
   (Components in src/components are auto-imported, no `import` needed.)
@@ -33,6 +34,23 @@
       height="140"
       :src="imageUrl"
     >
+      <!-- FAVORITE BUTTON, top-left corner of the image.
+           The whole card is a link, and this button is INSIDE it. Without
+           modifiers, a click would toggle the favorite AND open the deal page:
+           - .stop    stops the click from reaching the parent elements
+           - .prevent cancels the browser's default action (following the link)
+           The icon and colour depend on isFavorite(): when the store's
+           `favorites` change, they update by themselves. -->
+      <v-btn
+        :aria-label="isFavorite ? 'Remove from favorites' : 'Add to favorites'"
+        class="ma-2 position-absolute left-0"
+        :color="isFavorite ? 'red' : 'white'"
+        :icon="isFavorite ? 'mdi-heart' : 'mdi-heart-outline'"
+        size="small"
+        variant="elevated"
+        @click.stop.prevent="dealsStore.toggleFavorite(deal.id)"
+      />
+
       <!-- Discount badge in the top-right corner of the image -->
       <v-chip
         class="ma-2 position-absolute right-0 font-weight-bold"
@@ -112,6 +130,7 @@
 <script setup>
   import { computed } from 'vue'
   import { toImageUrl } from '@/plugins/axios'
+  import { useDealsStore } from '@/stores/deals'
   import { formatPrice, formatSalePrice, formatYear } from '@/utils/format'
 
   // Props = the data the PARENT gives to this component.
@@ -128,8 +147,13 @@
     },
   })
 
-  // `computed` values are recalculated only when the props they use change.
+  const dealsStore = useDealsStore()
+
+  // `computed` values are recalculated only when the data they use changes.
   const imageUrl = computed(() => toImageUrl(props.deal.image))
+
+  // true if this card's deal is in the favorites (store getter with parameter)
+  const isFavorite = computed(() => dealsStore.isFavorite(props.deal.id))
 </script>
 
 <!--

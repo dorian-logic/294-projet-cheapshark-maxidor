@@ -19,6 +19,27 @@
         CheapShark Deal Finder
       </router-link>
     </v-app-bar-title>
+
+    <!-- NAVIGATION: `to` turns a button into a router link.
+         On phones (xs) only the icons are shown, to save space. -->
+    <template #append>
+      <!-- `exact`: only highlighted on "/" itself (every path starts with "/") -->
+      <v-btn exact prepend-icon="mdi-tag-outline" to="/">
+        <span class="d-none d-sm-inline">Deals</span>
+      </v-btn>
+      <v-btn class="mr-2" to="/favorites">
+        <!-- Badge = small bubble with the number of favorites.
+             :model-value hides it when there are none. -->
+        <v-badge
+          color="red"
+          :content="dealsStore.favorites.length"
+          :model-value="dealsStore.favorites.length > 0"
+        >
+          <v-icon icon="mdi-heart-outline" />
+        </v-badge>
+        <span class="d-none d-sm-inline ml-2">Favorites</span>
+      </v-btn>
+    </template>
   </v-app-bar>
 
   <v-main>
@@ -29,7 +50,10 @@
 </template>
 
 <script setup>
-  //
+  import { useDealsStore } from '@/stores/deals'
+
+  // Used for the number of favorites in the menu's badge
+  const dealsStore = useDealsStore()
 </script>
 
 <style scoped>

@@ -75,6 +75,11 @@ const SORTERS = {
  * It's a function (not a constant object) so that every reset gets a fresh
  * object instead of sharing (and modifying) the same one.
  */
+// Name under which the favorites are saved in the browser's localStorage.
+// Prefixed with the app's name so it can't clash with another app's data
+// (localStorage is shared by every page of the same website address).
+const FAVORITES_STORAGE_KEY = 'cheapshark-favorites'
+
 function createDefaultFilters () {
   return {
     search: '', // text typed in the search field
@@ -97,6 +102,11 @@ export const useDealsStore = defineStore('deals', {
     // are still on the same page of results.
     currentPage: 1,
     filters: createDefaultFilters(),
+    // IDs of the user's favorite deals, e.g. [12, 57, 3].
+    // We store IDs, not whole deal objects: they are small, they can't get
+    // out of date (the deal's price always comes from `deals`), and they are
+    // easy to save in localStorage.
+    favorites: [],
   }),
 
   getters: {
@@ -105,6 +115,23 @@ export const useDealsStore = defineStore('deals', {
      * Used by the detail page, which only knows the id (from the URL).
      */
     getDealById: state => id => state.deals.find(deal => deal.id === id),
+
+    /**
+     * Returns a function: isFavorite(12) -> true if deal 12 is a favorite.
+     * Used to choose the heart icon: filled (favorite) or outlined (not).
+     */
+    isFavorite: state => id => state.favorites.includes(id),
+
+    /**
+     * The favorite deals as full objects (not just IDs), for the favorites page.
+     * Each ID is turned into its deal with find(). If a favorite's deal isn't
+     * in `deals` (e.g. it's no longer on sale, or we're offline with only the
+     * sample data), find() returns undefined: filter(Boolean) removes those
+     * so the page never tries to display `undefined`.
+     */
+    getFavorites: state => state.favorites
+      .map(id => state.deals.find(deal => deal.id === id))
+      .filter(Boolean),
 
     /** Date at which the fallback sample data was saved (shown in the warning). */
     fallbackSavedAt: () => fallbackData.savedAt,
@@ -168,8 +195,18 @@ export const useDealsStore = defineStore('deals', {
 
   actions: {
     /**
+     * Prepares the store when the app starts. Called ONCE, in App.vue.
+     * 1. loadFavorites(): synchronous, reads localStorage (instant)
+     * 2. fetchDeals(): asynchronous, downloads the deals from the API
+     */
+    async init () {
+      this.loadFavorites()
+      await this.fetchDeals()
+    },
+
+    /**
      * Downloads the deals and the stores from the API and saves them in the state.
-     * Called by the page when it appears on screen.
+     * Called by init() at start-up, and again by the "Retry" buttons.
      */
     async fetchDeals () {
       // Already loaded from the API: no need to download everything again.
@@ -220,6 +257,53 @@ export const useDealsStore = defineStore('deals', {
     /** Puts every filter back to its default value. */
     resetFilters () {
       this.filters = createDefaultFilters()
+    },
+
+    /**
+     * Adds the deal to the favorites, or removes it if it's already there
+     * (the "toggle" pattern: one button, two effects), then saves.
+     * @param {number} id Deal id.
+     */
+    toggleFavorite (id) {
+      if (this.isFavorite(id)) {
+        // filter() keeps every id EXCEPT this one -> removed
+        this.favorites = this.favorites.filter(favoriteId => favoriteId !== id)
+      } else {
+        this.favorites.push(id)
+      }
+      this.saveFavorites()
+    },
+
+    /**
+     * Saves the favorites in localStorage, so they survive a page reload.
+     * localStorage can only store TEXT, so the array [12, 57] is converted
+     * to the string "[12,57]" with JSON.stringify().
+     */
+    saveFavorites () {
+      localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(this.favorites))
+    },
+
+    /**
+     * Reads the favorites saved by saveFavorites().
+     * JSON.parse() turns the text "[12,57]" back into the array [12, 57].
+     */
+    loadFavorites () {
+      const saved = localStorage.getItem(FAVORITES_STORAGE_KEY)
+      // First visit: nothing saved yet, getItem() returns null.
+      if (!saved) {
+        return
+      }
+      try {
+        const parsed = JSON.parse(saved)
+        // Only accept what we expect: an array of numbers.
+        if (Array.isArray(parsed)) {
+          this.favorites = parsed.filter(id => typeof id === 'number')
+        }
+      } catch (error) {
+        // The saved text isn't valid JSON (edited by hand, corrupted...):
+        // start with no favorites instead of crashing the whole app.
+        console.warn('Ignoring invalid saved favorites:', error)
+      }
     },
 
     /**
