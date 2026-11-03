@@ -15,3 +15,11 @@
     via the DIVTEC API — school project, module 294
   </v-footer>
 </template>
+
+<style scoped>
+  /* Same colour as the footer text instead of the browser's default link blue */
+  a {
+    color: inherit;
+    text-underline-offset: 2px;
+  }
+</style>

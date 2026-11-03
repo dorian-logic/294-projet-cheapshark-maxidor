@@ -30,7 +30,7 @@
     </v-btn>
 
     <!-- 1. LOADING (direct visit: the data isn't there yet) -->
-    <div v-if="dealsStore.loading" class="text-center py-12">
+    <div v-if="dealsStore.isLoading" class="text-center py-12">
       <v-progress-circular color="primary" indeterminate size="48" />
       <p class="mt-4 text-medium-emphasis">
         Loading deal...
@@ -48,7 +48,7 @@
       {{ dealsStore.error }}
       This deal is not part of the saved sample deals.
       <template #append>
-        <v-btn variant="outlined" @click="dealsStore.loadDeals()">
+        <v-btn variant="outlined" @click="dealsStore.fetchDeals()">
           Retry
         </v-btn>
       </template>
@@ -73,14 +73,19 @@
 
     <!-- 3. THE DEAL (with a small reminder if it comes from the sample data) -->
     <v-alert
-      v-if="deal && dealsStore.usingFallback && !dealsStore.loading"
+      v-if="deal && dealsStore.usingFallback && !dealsStore.isLoading"
       class="mb-4"
       density="compact"
       text="Offline: showing saved sample data, prices may be out of date."
       type="warning"
       variant="tonal"
     />
-    <v-card v-if="deal && !dealsStore.loading">
+    <v-card
+      v-if="deal && !dealsStore.isLoading"
+      border
+      rounded="lg"
+      variant="flat"
+    >
       <v-row no-gutters>
         <!-- Left column (full width on phones): the image -->
         <v-col cols="12" md="5">
@@ -195,7 +200,7 @@
 <script setup>
   import { computed, onMounted } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
-  import { toImageUrl } from '@/services/api'
+  import { toImageUrl } from '@/plugins/axios'
   import { useDealsStore } from '@/stores/deals'
   import { formatDate, formatPrice, formatSalePrice } from '@/utils/format'
 
@@ -213,7 +218,7 @@
   // The deal to display. `computed` makes it update automatically:
   // - when the deals finish loading (direct visit), or
   // - if the id in the URL changes.
-  const deal = computed(() => dealsStore.dealById(dealId.value))
+  const deal = computed(() => dealsStore.getDealById(dealId.value))
 
   const storeLogo = computed(() =>
     deal.value ? dealsStore.storeLogo(deal.value.store) : '',
@@ -257,9 +262,9 @@
   }
 
   // Direct visit: the store is empty, so load the data.
-  // When coming from the list, loadDeals() sees the data is already
+  // When coming from the list, fetchDeals() sees the data is already
   // there and returns immediately (see the guard in the store).
   onMounted(() => {
-    dealsStore.loadDeals()
+    dealsStore.fetchDeals()
   })
 </script>

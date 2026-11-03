@@ -14,7 +14,7 @@
   Nobody needs to "call a filter function": Vue's reactivity does it.
 -->
 <template>
-  <v-card class="pa-4" variant="tonal">
+  <v-card border class="pa-4" rounded="lg" variant="flat">
     <v-row dense>
       <v-col cols="12" md="4">
         <v-text-field

@@ -18,7 +18,7 @@
 
 import { defineStore } from 'pinia'
 import fallbackData from '@/data/fallback-data.json'
-import { fetchAllDeals, fetchStores, toImageUrl } from '@/services/api'
+import { fetchAllDeals, fetchStores, toImageUrl } from '@/plugins/axios'
 
 /**
  * Sort choices shown in the filter bar.
@@ -89,7 +89,7 @@ export const useDealsStore = defineStore('deals', {
   state: () => ({
     deals: [], // every deal downloaded from the API
     stores: [], // every store (used for the logos)
-    loading: false, // true while the download is in progress
+    isLoading: false, // true while the download is in progress
     error: null, // message to show if the download failed, otherwise null
     usingFallback: false, // true when we show the saved sample data instead of the API's
     // Page of results shown in the list. It lives in the store (not in the
@@ -101,10 +101,10 @@ export const useDealsStore = defineStore('deals', {
 
   getters: {
     /**
-     * Returns a function: dealById(12) -> the deal with id 12, or undefined.
+     * Returns a function: getDealById(12) -> the deal with id 12, or undefined.
      * Used by the detail page, which only knows the id (from the URL).
      */
-    dealById: state => id => state.deals.find(deal => deal.id === id),
+    getDealById: state => id => state.deals.find(deal => deal.id === id),
 
     /** Date at which the fallback sample data was saved (shown in the warning). */
     fallbackSavedAt: () => fallbackData.savedAt,
@@ -171,7 +171,7 @@ export const useDealsStore = defineStore('deals', {
      * Downloads the deals and the stores from the API and saves them in the state.
      * Called by the page when it appears on screen.
      */
-    async loadDeals () {
+    async fetchDeals () {
       // Already loaded from the API: no need to download everything again.
       // (If we are showing the fallback data, we DO try again: that's "Retry".)
       if (this.deals.length > 0 && !this.usingFallback) {
@@ -179,11 +179,11 @@ export const useDealsStore = defineStore('deals', {
       }
       // A download is already running (e.g. the list page and the detail page
       // both asked for the data): don't start a second one in parallel.
-      if (this.loading) {
+      if (this.isLoading) {
         return
       }
 
-      this.loading = true
+      this.isLoading = true
       this.error = null
 
       try {
@@ -213,7 +213,7 @@ export const useDealsStore = defineStore('deals', {
       } finally {
         // `finally` runs in both cases (success or error),
         // so the loading indicator always disappears.
-        this.loading = false
+        this.isLoading = false
       }
     },
 

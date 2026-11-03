@@ -15,16 +15,19 @@
 -->
 <template>
   <v-container>
-    <h1 class="text-h4 font-weight-bold my-4">
+    <h1 class="text-h4 font-weight-bold mt-6 mb-1">
       Game deals
     </h1>
+    <p class="text-medium-emphasis mb-6">
+      Discounted PC games from Steam, GOG, Epic and more, filtered your way.
+    </p>
 
     <DealFilters class="mb-6" />
 
     <!-- OFFLINE WARNING: the API failed and we are showing the saved sample
          data. It sits ABOVE the list (the list is still shown below it). -->
     <v-alert
-      v-if="dealsStore.usingFallback && !dealsStore.loading"
+      v-if="dealsStore.usingFallback && !dealsStore.isLoading"
       class="mb-6"
       title="Showing saved sample deals"
       type="warning"
@@ -34,14 +37,14 @@
       These deals were saved on {{ formatDate(dealsStore.fallbackSavedAt) }}
       and may be out of date.
       <template #append>
-        <v-btn variant="outlined" @click="dealsStore.loadDeals()">
+        <v-btn variant="outlined" @click="dealsStore.fetchDeals()">
           Retry
         </v-btn>
       </template>
     </v-alert>
 
     <!-- 1. LOADING: shown while the API download is in progress -->
-    <div v-if="dealsStore.loading" class="text-center py-12">
+    <div v-if="dealsStore.isLoading" class="text-center py-12">
       <v-progress-circular color="primary" indeterminate size="48" />
       <p class="mt-4 text-medium-emphasis">
         Loading deals...
@@ -58,7 +61,7 @@
     >
       {{ dealsStore.error }}
       <template #append>
-        <v-btn variant="outlined" @click="dealsStore.loadDeals()">
+        <v-btn variant="outlined" @click="dealsStore.fetchDeals()">
           Retry
         </v-btn>
       </template>
@@ -154,6 +157,6 @@
 
   // onMounted runs once, when the page is displayed for the first time.
   onMounted(() => {
-    dealsStore.loadDeals()
+    dealsStore.fetchDeals()
   })
 </script>

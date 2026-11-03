@@ -3,6 +3,7 @@
 - Step 1: deal list, filters, sorting (sections 1-6)
 - Step 2: offline fallback, shared formatting (section 7)
 - Step 3: Vue Router, one page per deal, 404 page (section 8)
+- Step 4: names aligned with the course, styling (section 9)
 
 (Step 2 first showed the details in a dialog. Step 3 replaced it with a real
 page per deal, as recommended in class.)
@@ -54,7 +55,7 @@ Things the API **cannot** do, and which shaped the design:
 
 ```
 src/
-├── services/api.js         Talks to the API (axios). Nothing else does.
+├── plugins/axios.js        Talks to the API (axios). Nothing else does.
 ├── stores/deals.js         Pinia store: the data + filters + filtering/sorting logic
 ├── data/fallback-data.json Saved sample deals, shown when the API is down
 ├── utils/format.js         Price/date formatting shared by several components
@@ -75,7 +76,7 @@ Each layer has **one responsibility** ("separation of concerns"):
 
 | Layer | Knows about HTTP? | Knows about the screen? |
 |---|---|---|
-| `services/api.js` | yes | no |
+| `plugins/axios.js` | yes | no |
 | `stores/deals.js` | no (calls the service) | no |
 | components / page | no | yes |
 
@@ -90,12 +91,12 @@ components change.
 
 ```
 pages/index.vue  onMounted()
-   └─> dealsStore.loadDeals()                (action)
-         ├─> loading = true
+   └─> dealsStore.fetchDeals()                (action)
+         ├─> isLoading = true
          ├─> fetchAllDeals() + fetchStores()  (service, in parallel)
          │      └─> GET /deals?page=1 ... page=5, GET /stores
          ├─> deals = [...500 deals], stores = [...]
-         └─> loading = false   (in `finally`, also on error)
+         └─> isLoading = false   (in `finally`, also on error)
 ```
 
 **When the user changes a filter**
@@ -116,7 +117,7 @@ No function is called by hand to "apply" the filters: this is Vue's
 
 ## 4. File by file: the important decisions
 
-### `services/api.js`
+### `plugins/axios.js`
 
 - **`axios.create({ baseURL, timeout })`** builds a pre-configured axios
   instance. Every call (`api.get('/deals')`) automatically gets the base URL
@@ -134,7 +135,7 @@ No function is called by hand to "apply" the filters: this is Vue's
 - **`toImageUrl(path)`** turns `/images/x.webp` into
   `https://apis.divtec.me/images/x.webp`. Without it the browser would look
   for the image on *our* server (`localhost:3000/images/...`) and fail.
-- **`import.meta.env.VITE_API_BASE_URL`**: Vite reads the `.env` file and
+- **`import.meta.env.VITE_API_URL`**: Vite reads the `.env` file and
   exposes variables starting with `VITE_`. The `||` fallback means the app
   still works when `.env` doesn't exist (fresh clone, GitHub Pages).
 
@@ -142,9 +143,9 @@ No function is called by hand to "apply" the filters: this is Vue's
 
 | Part | Contains | Comparable to |
 |---|---|---|
-| `state` | `deals`, `stores`, `loading`, `error`, `filters` | `data()` |
+| `state` | `deals`, `stores`, `isLoading`, `error`, `filters` | `data()` |
 | `getters` | `storeNames`, `storeLogo`, `filteredDeals` | `computed` |
-| `actions` | `loadDeals()`, `resetFilters()` | `methods` |
+| `actions` | `fetchDeals()`, `resetFilters()` | `methods` |
 
 - **Why a store?** The filter bar *writes* the filters and the page *reads* the
   result. Both need the same data. The store is one shared instance:
@@ -167,7 +168,7 @@ No function is called by hand to "apply" the filters: this is Vue's
 - **`createDefaultFilters()` is a function**, not a constant object: each reset
   gets a brand-new object, so the default values can never be modified by
   accident.
-- **`loadDeals()`** uses `try / catch / finally`:
+- **`fetchDeals()`** uses `try / catch / finally`:
   - `try`: download. `catch`: save a readable message in `error`.
   - `error.response` exists → the server answered with an error code (404,
     500…). It doesn't exist → the server was never reached (offline, timeout).
@@ -239,7 +240,7 @@ given (reusable). `DealFilters` uses the store because its job is precisely to
 change shared state.
 
 **What happens if the API is down?** The `catch` stores a message, the page
-shows a red alert with a *Retry* button that calls `loadDeals()` again.
+shows a red alert with a *Retry* button that calls `fetchDeals()` again.
 
 **Why `toSorted()` and not `sort()`?** `sort()` modifies the array in place;
 in a store that could change `state.deals` by accident. `toSorted()` returns a
@@ -275,12 +276,12 @@ instead of an error page.
   date they were saved (`savedAt`).
 - It's imported with a normal `import` in the store. Vite **bundles it into the
   app at build time**, so it's available even with no network at all.
-- In `loadDeals()`, the `catch` block also does:
+- In `fetchDeals()`, the `catch` block also does:
   `deals = fallbackData.deals`, `stores = fallbackData.stores`,
   `usingFallback = true`.
 - The list shows an orange warning **above** the cards (not instead of them):
   why, how old the data is, and a **Retry** button.
-- **Retry** calls `loadDeals()` again. The guard at the top is
+- **Retry** calls `fetchDeals()` again. The guard at the top is
   `if (deals.length > 0 && !usingFallback) return`. Otherwise "we already have
   data" (the sample data) would block the retry.
 - In fallback mode the images and logos can't load (they're on the API's
@@ -357,7 +358,7 @@ URL carries the information ("show deal 12").
 URL /deals/12
   └─> route.params.id = "12"         (always TEXT)
         └─> dealId = Number("12") = 12  (ids in the data are NUMBERS; 12 === "12" is false)
-              └─> deal = dealsStore.dealById(12)   (getter: deals.find(d => d.id === 12))
+              └─> deal = dealsStore.getDealById(12)   (getter: deals.find(d => d.id === 12))
 ```
 
 `deal` is a `computed`, which is the key to the **two ways to arrive** here:
@@ -365,8 +366,8 @@ URL /deals/12
 1. **From the list:** the deals are already in the store → `deal` is found
    immediately.
 2. **Directly** (bookmark, shared link, F5 on the page): the app has just
-   started, the store is **empty**. `onMounted` calls `loadDeals()`, the page
-   shows a spinner (`dealsStore.loading`), and when the data arrives `deal`
+   started, the store is **empty**. `onMounted` calls `fetchDeals()`, the page
+   shows a spinner (`dealsStore.isLoading`), and when the data arrives `deal`
    recalculates **by itself** and the page appears. No `await`, no manual
    refresh: reactivity does it.
 
@@ -377,11 +378,11 @@ which matches nothing) → the deal.
 **Why not `GET /deals/:id`?** On a direct visit, loading the full list (5
 requests) means that when the user goes back to the list, it's already there,
 filters work, and there is one single way data enters the app
-(`loadDeals()`). Fetching only `/deals/12` would be lighter for that one page
+(`fetchDeals()`). Fetching only `/deals/12` would be lighter for that one page
 but would need a second loading path and a second set of states.
 
-**The store guard against double downloads:** `loadDeals()` now also returns
-early `if (this.loading)`. Without it, the list and detail page could both start
+**The store guard against double downloads:** `fetchDeals()` now also returns
+early `if (this.isLoading)`. Without it, the list and detail page could both start
 a download at the same time.
 
 ### Going back to the list
@@ -453,3 +454,52 @@ destroyed on navigation. The store outlives every page.
 **Why `push('/')` and not `back()` for "All deals from <store>"?** The user
 wants a *new* view of the list (filtered, page 1, top of the page), not to
 return to the previous one.
+
+---
+
+## 9. Step 4: course naming conventions and styling
+
+### Names aligned with the course (devjs.ch)
+
+| Before | Now (course convention) |
+|---|---|
+| `src/services/api.js` | `src/plugins/axios.js` (the shared axios instance + API functions) |
+| `.env`: `VITE_API_BASE_URL` | `VITE_API_URL` |
+| store state `loading` | `isLoading` |
+| store getter `dealById(id)` | `getDealById(id)` |
+| store action `loadDeals()` | `fetchDeals()` |
+
+Only names changed; the behaviour is identical.
+
+### Styling: three tools, from simplest to most specific
+
+1. **Vuetify props**: most of the look comes from props, no CSS at all:
+   `variant="flat"` (no shadow), `border` (thin border in the theme's colour),
+   `rounded="lg"` (rounded corners), `flat` + `border="b"` on the app bar.
+2. **Vuetify utility classes**: spacing and text: `mt-6`, `mb-1`,
+   `text-medium-emphasis`, `font-weight-bold`...
+3. **`<style scoped>` in a component** for what props can't do (hover
+   animation, 2-line titles). `scoped` means the CSS only applies to that
+   component: Vue adds a unique attribute (`data-v-xxxx`) to the component's
+   HTML and to the selectors, so class names can't clash between components.
+
+**Why no hard-coded colours?** The theme is `system`: dark if the computer is
+in dark mode, light otherwise. Props like `border` and the default bar colour
+use the theme's colours, so everything adapts to both modes automatically.
+
+### `DealCard.vue` styles
+
+- **Hover**: `transform: translateY(-4px)` lifts the card and `box-shadow`
+  adds a soft shadow; `transition` animates both over 0.2 s.
+- **Image zoom**: `:deep(.v-img__img)`. The `<img>` is created *inside* the
+  `v-img` component, so it doesn't receive our scoped attribute and a normal
+  scoped selector can't reach it. `:deep()` lets a scoped rule target an
+  element inside a child component.
+- **`flex-shrink: 0` on the image**: the card is a flex column; when a title
+  took 2 lines, the image was allowed to shrink and became shorter than its
+  neighbours. Now it keeps its 140 px.
+- **2-line titles**: `-webkit-line-clamp: 2` cuts long titles with "…", and
+  `min-height` keeps every title 2 lines tall, so prices line up across a row.
+  The full title is still visible on hover (`:title`) and on the detail page.
+- **`@media (prefers-reduced-motion: reduce)`**: users who asked their system
+  for less motion get no animation (accessibility).
