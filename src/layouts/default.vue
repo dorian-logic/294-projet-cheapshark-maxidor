@@ -7,9 +7,9 @@
 -->
 <template>
   <!-- `flat` + `border="b"`: no shadow, just a thin line under the bar.
-       Without a `color`, the bar uses the theme's surface colour, so it is
-       light in light mode and dark in dark mode. -->
-  <v-app-bar border="b" density="comfortable" flat>
+       The bar is semi-transparent and blurs what's behind it (see the
+       <style> block), so the cards slide underneath it when scrolling. -->
+  <v-app-bar border="b" class="app-bar" density="comfortable" flat>
     <template #prepend>
       <v-icon class="ml-2" color="success" icon="mdi-tag-multiple" />
     </template>
@@ -57,6 +57,20 @@
 </script>
 
 <style scoped>
+  /* Semi-transparent bar + blur ("frosted glass").
+     rgba(var(--v-theme-surface), 0.75) = the theme's surface colour at 75 %
+     opacity: Vuetify exposes every theme colour as a CSS variable holding
+     "r,g,b", so this works in both dark and light mode.
+     !important is needed because Vuetify sets the bar's background itself.
+     The `noinspection` comment below is for WebStorm only: Vuetify creates
+     --v-theme-surface in the browser at runtime, so the IDE can't find it in
+     our files and would wrongly report it as an error. */
+  /* noinspection CssUnresolvedCustomProperty */
+  .app-bar {
+    background: rgba(var(--v-theme-surface), 0.75) !important;
+    backdrop-filter: blur(12px);
+  }
+
   /* The title is a link: keep the bar's text colour instead of link blue */
   .app-title {
     color: inherit;

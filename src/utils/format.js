@@ -58,3 +58,30 @@ export function formatDate (isoDate) {
 export function formatYear (isoDate) {
   return isoDate?.slice(0, 4) ?? ''
 }
+
+/**
+ * Colour of a score, the way Metacritic colours its own scores:
+ * 75-100 green (good), 50-74 orange (mixed), 0-49 red (bad).
+ * Returns a Vuetify colour name, used by the cards and the detail page.
+ * @param {number} score Score from 0 to 100.
+ * @returns {string}
+ */
+export function scoreColor (score) {
+  if (score >= 75) {
+    return 'success'
+  }
+  if (score >= 50) {
+    return 'warning'
+  }
+  return 'error'
+}
+
+/**
+ * "1 deal", "0 deals", "500 deals": adds an "s" except for exactly 1.
+ * @param {number} count
+ * @param {string} word Singular form, e.g. 'deal'.
+ * @returns {string}
+ */
+export function plural (count, word) {
+  return `${count} ${word}${count === 1 ? '' : 's'}`
+}

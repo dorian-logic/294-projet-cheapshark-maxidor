@@ -45,7 +45,7 @@
     <!-- 3. THE FAVORITES: same grid and same card as the home page -->
     <template v-else>
       <p class="mb-4 text-medium-emphasis">
-        {{ dealsStore.getFavorites.length }} favorite(s)
+        {{ plural(dealsStore.getFavorites.length, 'favorite') }}
       </p>
 
       <v-row>
@@ -67,7 +67,7 @@
       <!-- Saved favorites whose deal isn't in the current data (offline with
            only the sample deals, or the deal is no longer on sale) -->
       <p v-if="hiddenCount > 0" class="mt-4 text-medium-emphasis">
-        {{ hiddenCount }} favorite(s) can't be shown right now: offline, or no longer on sale.
+        {{ plural(hiddenCount, 'favorite') }} can't be shown right now: offline, or no longer on sale.
       </p>
     </template>
   </v-container>
@@ -76,6 +76,7 @@
 <script setup>
   import { computed } from 'vue'
   import { useDealsStore } from '@/stores/deals'
+  import { plural } from '@/utils/format'
 
   const dealsStore = useDealsStore()
 

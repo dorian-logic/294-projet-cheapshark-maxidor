@@ -212,7 +212,7 @@
   import { useRoute, useRouter } from 'vue-router'
   import { toImageUrl } from '@/plugins/axios'
   import { useDealsStore } from '@/stores/deals'
-  import { formatDate, formatPrice, formatSalePrice } from '@/utils/format'
+  import { formatDate, formatPrice, formatSalePrice, scoreColor } from '@/utils/format'
 
   // useRoute()  = information about the CURRENT address (params, query...).
   // useRouter() = the router itself, to navigate (push, back...).
@@ -240,16 +240,8 @@
     (deal.value?.normalPrice ?? 0) - (deal.value?.salePrice ?? 0),
   )
 
-  // Colour of a score bar: green = good, orange = average, red = bad.
-  function scoreColor (score) {
-    if (score >= 75) {
-      return 'success'
-    }
-    if (score >= 50) {
-      return 'warning'
-    }
-    return 'error'
-  }
+  // scoreColor() (green / orange / red) comes from utils/format.js, shared
+  // with the cards so both always use the same thresholds.
 
   // "Back to deals":
   // - If the user came from the list, go BACK in the browser history, exactly

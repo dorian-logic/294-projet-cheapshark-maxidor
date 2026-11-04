@@ -133,6 +133,16 @@ export const useDealsStore = defineStore('deals', {
       .map(id => state.deals.find(deal => deal.id === id))
       .filter(Boolean),
 
+    /**
+     * true if at least one filter is active (the sort order doesn't count:
+     * it changes the order, not which deals are shown). Used to show the
+     * "Reset filters" button only when there is something to reset.
+     */
+    hasActiveFilters: state => {
+      const { search, store, maxPrice, minSavings } = state.filters
+      return Boolean((search ?? '').trim()) || store !== null || maxPrice !== null || minSavings > 0
+    },
+
     /** Date at which the fallback sample data was saved (shown in the warning). */
     fallbackSavedAt: () => fallbackData.savedAt,
 

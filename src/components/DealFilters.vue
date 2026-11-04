@@ -12,82 +12,98 @@
   -> the page, which displays `filteredDeals`, re-renders.
 
   Nobody needs to "call a filter function": Vue's reactivity does it.
+
+  The "Reset filters" button is next to the results count (pages/index.vue),
+  and only appears when a filter is active.
 -->
 <template>
-  <v-card border class="pa-4" rounded="lg" variant="flat">
-    <v-row dense>
-      <v-col cols="12" md="4">
+  <!-- No border: the panel stands out from the page through its colour alone
+       (theme `surface` on top of the darker `background`).
+       Fields: density="compact" (less height), variant="solo-filled" (filled
+       background, no underline), rounded="lg", flat (no shadow).
+       Layout: 1 field per row on phones, 2 on tablets/laptops (md), and
+       everything on ONE row on wide screens (lg): 3+2+2+3+2 = 12 columns. -->
+  <v-card class="pa-3" rounded="lg" variant="flat">
+    <v-row align="center" dense>
+      <v-col cols="12" lg="3" md="6">
         <v-text-field
           v-model="dealsStore.filters.search"
+          aria-label="Search a game"
           clearable
-          density="comfortable"
+          density="compact"
+          flat
           hide-details
-          label="Search a game"
+          placeholder="Search a game"
           prepend-inner-icon="mdi-magnify"
+          rounded="lg"
+          variant="solo-filled"
         />
       </v-col>
 
-      <v-col cols="12" md="4" sm="6">
+      <v-col cols="12" lg="2" md="3" sm="6">
         <v-select
           v-model="dealsStore.filters.store"
+          aria-label="Store"
           clearable
-          density="comfortable"
+          density="compact"
+          flat
           hide-details
           :items="dealsStore.storeNames"
-          label="Store"
-          persistent-placeholder
           placeholder="All stores"
           prepend-inner-icon="mdi-storefront-outline"
+          rounded="lg"
+          variant="solo-filled"
         />
       </v-col>
 
-      <v-col cols="12" md="4" sm="6">
-        <v-select
-          v-model="dealsStore.filters.sortBy"
-          density="comfortable"
-          hide-details
-          :items="SORT_OPTIONS"
-          label="Sort by"
-          prepend-inner-icon="mdi-sort"
-        />
-      </v-col>
-
-      <v-col cols="12" md="4" sm="6">
+      <v-col cols="12" lg="2" md="3" sm="6">
         <!-- v-select uses each option's `value` as the stored value
              and its `title` as the visible text. Clearing it sets null. -->
         <v-select
           v-model="dealsStore.filters.maxPrice"
+          aria-label="Max price"
           clearable
-          density="comfortable"
+          density="compact"
+          flat
           hide-details
           :items="MAX_PRICE_OPTIONS"
-          label="Max price"
-          persistent-placeholder
           placeholder="Any price"
           prepend-inner-icon="mdi-currency-usd"
+          rounded="lg"
+          variant="solo-filled"
         />
       </v-col>
 
-      <v-col class="d-flex align-center" cols="12" md="6" sm="6">
+      <v-col cols="12" lg="3" md="6" sm="6">
+        <v-select
+          v-model="dealsStore.filters.sortBy"
+          aria-label="Sort by"
+          density="compact"
+          flat
+          hide-details
+          :items="SORT_OPTIONS"
+          prepend-inner-icon="mdi-sort"
+          rounded="lg"
+          variant="solo-filled"
+        />
+      </v-col>
+
+      <v-col cols="12" lg="2" md="6" sm="6">
+        <!-- Small label above the slider. At 0 % the filter does nothing,
+             so "Any" is clearer than "0%". -->
+        <div class="text-caption text-medium-emphasis px-1">
+          Min. discount: {{ dealsStore.filters.minSavings === 0 ? 'Any' : `${dealsStore.filters.minSavings}%` }}
+        </div>
         <v-slider
           v-model="dealsStore.filters.minSavings"
+          aria-label="Minimum discount"
           color="success"
+          density="compact"
           hide-details
-          :label="`Min. discount: ${dealsStore.filters.minSavings}%`"
           :max="100"
           :min="0"
           :step="10"
         />
-      </v-col>
-
-      <v-col class="d-flex align-center justify-end" cols="12" md="2">
-        <v-btn
-          prepend-icon="mdi-filter-remove-outline"
-          variant="text"
-          @click="dealsStore.resetFilters()"
-        >
-          Reset
-        </v-btn>
       </v-col>
     </v-row>
   </v-card>

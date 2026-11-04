@@ -5,6 +5,7 @@
 - Step 3: Vue Router, one page per deal, 404 page (section 8)
 - Step 4: names aligned with the course, styling (section 9)
 - Step 5: favorites with localStorage, store init() in App.vue (section 10)
+- Step 6: visual polish: theme colours, card layout, compact filters (section 11)
 
 (Step 2 first showed the details in a dialog. Step 3 replaced it with a real
 page per deal, as recommended in class.)
@@ -495,7 +496,7 @@ use the theme's colours, so everything adapts to both modes automatically.
 
 - **Hover**: `transform: translateY(-4px)` lifts the card and `box-shadow`
   adds a soft shadow; `transition` animates both over 0.2 s.
-- **Image zoom**: `:deep(.v-img__img)`. The `<img>` is created *inside* the
+- **Image zoom**: `:deep(img)`. The `<img>` is created *inside* the
   `v-img` component, so it doesn't receive our scoped attribute and a normal
   scoped selector can't reach it. `:deep()` lets a scoped rule target an
   element inside a child component.
@@ -626,3 +627,115 @@ secure (any script on the page can read it), not a replacement for a database.
 favorites must be loaded before any page displays hearts, whatever page the
 user opens first, and only once: `App.vue` is the only component that exists
 for the whole life of the app.
+
+---
+
+## 11. Step 6: visual polish
+
+All changes are visual: the data, the store logic and the navigation are the
+same as in step 5.
+
+### Theme (`plugins/vuetify.js`), a sequence 8 topic
+
+`createVuetify({ theme: { themes: { dark: { colors: {...} }, light: {...} } } })`
+overrides a few colours of Vuetify's built-in `dark` and `light` themes; every
+other colour keeps its default. `defaultTheme: 'system'` still follows the
+computer's dark/light setting.
+
+| Colour | Dark | Light | Used for |
+|---|---|---|---|
+| `background` | `#0e1117` | `#f3f5f9` | the page itself (back layer) |
+| `surface` | `#171b24` | `#ffffff` | cards, filter panel, app bar (front layer) |
+| `free` (our own) | `#fbbf24` | `#b45309` | "FREE" prices, class `text-free` |
+
+**Why layers?** Before, page, panel and cards were nearly the same grey and
+only thin borders separated them, so it looked flat. A darker background with
+lighter surfaces on top gives depth without extra borders or shadows. The dark
+colours have a slight blue tint instead of neutral grey.
+
+**Custom colour `free`:** declaring a colour in the theme makes Vuetify create
+the classes `text-free` and `bg-free`. Having a dark *and* a light value keeps
+the text readable on both backgrounds (light amber on white was nearly
+invisible).
+
+**`defaults`:** default props for every component of a type.
+`VBtn: { class: 'text-none', style: 'letter-spacing: normal' }` removes
+Vuetify's UPPERCASE, widely spaced button text everywhere at once.
+
+### App bar and footer
+
+- **Frosted-glass bar:** `background: rgba(var(--v-theme-surface), 0.75)` +
+  `backdrop-filter: blur(12px)`. Vuetify exposes each theme colour as a CSS
+  variable holding "r,g,b", so `rgba(var(...), 0.75)` = that colour at 75 %
+  opacity, in dark and light mode alike. The cards blur as they scroll under it.
+- **Footer without `app`:** `v-footer app` is *fixed* at the bottom of the
+  screen and covered the last row of cards. Without `app`, it simply comes
+  after the content.
+
+### The card (`DealCard.vue`)
+
+```
+┌────────────────────────┐
+│ ♡               -85%   │  image: fixed 460:215 ratio, cover
+├────────────────────────┤
+│ ▪ Steam                │  store: small grey label
+│ Title on max two lines │  h2, clamped to 2 lines
+│                        │  ← free space (mt-auto)
+│ $2.50  $24.99          │  price row always at the bottom
+│ [Metacritic 86][95%] 2019 │
+└────────────────────────┘
+```
+
+- **`:aspect-ratio="460 / 215"` + `cover`:** every image gets the same frame
+  (460×215 is the usual Steam format). `cover` fills the frame and crops what
+  doesn't fit, so an image with other proportions no longer shows bars.
+- **`mt-auto` on the price block:** the card body is a flex column; an
+  automatic top margin takes all the free space above the element, so the
+  price is pushed to the bottom. Prices line up across a row whatever the
+  title's length, without reserving empty lines under short titles.
+- **Heart:** dark see-through circle (`rgba(0,0,0,0.45)` + blur) instead of a
+  bright white one, so the eye goes to the games first. Red filled heart when
+  favorited.
+- **Scores coloured like Metacritic:** green ≥ 75, orange 50–74, red < 50
+  (`scoreColor()` in `utils/format.js`, shared with the detail page). The year
+  is plain grey text instead of a chip.
+- **Free games:** no "-100%" badge (it repeated "FREE"); the price "FREE" is in
+  the `free` theme colour so free games stand out.
+- **`font-variant-numeric: tabular-nums`:** all digits get the same width, so
+  prices don't wobble from card to card.
+- **`<h2>` titles:** the page title is the `<h1>`; card titles one level below
+  keep a correct heading structure for screen readers.
+
+### Filters (`DealFilters.vue`)
+
+- One compact row on wide screens: `lg` widths 3 + 2 + 2 + 3 + 2 = 12 columns.
+  Two rows on laptops (`md`), one field per row on phones.
+- `density="compact"`, `variant="solo-filled"`, `rounded="lg"`, `flat`;
+  placeholders instead of floating labels, `aria-label` so screen readers
+  still announce each field.
+- The slider label says "Any" at 0 % (the filter is then inactive).
+- **Reset filters** moved next to the results count and only appears when a
+  filter is active, using the new store getter `hasActiveFilters` (the sort
+  order doesn't count: it changes the order, not which deals are shown).
+
+### Texts
+
+`plural(count, 'deal')` in `utils/format.js` gives "1 deal" / "40 deals"
+instead of "deal(s)"; same for favorites.
+
+### IDE checks before committing (WebStorm)
+
+WebStorm runs ESLint and its own CSS checks before each commit. Two of its
+reports were false alarms, and the code was adjusted so the checks pass:
+
+- `var(--v-theme-surface)` "cannot resolve": Vuetify creates its theme
+  variables **in the browser at runtime**, so the IDE can't find them in our
+  files. The comment `/* noinspection CssUnresolvedCustomProperty */` above the
+  rule tells WebStorm (and only WebStorm) to skip that check there.
+- "Selector `v-img__img` is never used": that class is added by Vuetify inside
+  `v-img`, invisible to the IDE. The rules now target the `img` tag with
+  `:deep(img)`, which has the same effect and can be checked.
+- A real one, fixed: ESLint's `perfectionist/sort-imports` rule wants imports
+  in a fixed order (packages before side-effect imports like CSS files).
+  `npx eslint --fix <file>` reorders them automatically.
+

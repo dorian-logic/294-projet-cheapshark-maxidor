@@ -84,9 +84,22 @@
 
     <!-- 4. RESULTS -->
     <template v-else>
-      <p class="mb-4 text-medium-emphasis">
-        {{ dealsStore.filteredDeals.length }} deal(s) found — click a deal for details
-      </p>
+      <!-- Results count + "Reset filters" (only when a filter is active) -->
+      <div class="d-flex align-center flex-wrap ga-2 mb-4">
+        <span class="text-medium-emphasis">
+          {{ plural(dealsStore.filteredDeals.length, 'deal') }}
+        </span>
+        <v-btn
+          v-if="dealsStore.hasActiveFilters"
+          density="comfortable"
+          prepend-icon="mdi-filter-remove-outline"
+          size="small"
+          variant="text"
+          @click="dealsStore.resetFilters()"
+        >
+          Reset filters
+        </v-btn>
+      </div>
 
       <!-- Responsive grid: 1 card per row on phones, 2 on tablets,
            3 on laptops, 4 on large screens (12 columns / cols value) -->
@@ -120,7 +133,7 @@
 <script setup>
   import { computed, watch } from 'vue'
   import { useDealsStore } from '@/stores/deals'
-  import { formatDate } from '@/utils/format'
+  import { formatDate, plural } from '@/utils/format'
 
   const dealsStore = useDealsStore()
 
