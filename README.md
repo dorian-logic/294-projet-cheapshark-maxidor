@@ -175,8 +175,7 @@ Outils utiles : Figma / Draw.io / ...
 ## 8. 📖 How it works (technical documentation)
 
 Detailed explanation of the code: architecture, data flow, and the reasons
-behind each technical choice, step by step. (Also available as
-[`docs/HOW-IT-WORKS.md`](docs/HOW-IT-WORKS.md).)
+behind each technical choice, step by step.
 
 - Step 1: deal list, filters, sorting (sections 1-6)
 - Step 2: offline fallback, shared formatting (section 7)
