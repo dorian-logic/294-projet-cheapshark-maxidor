@@ -107,6 +107,10 @@ export const useDealsStore = defineStore('deals', {
     // out of date (the deal's price always comes from `deals`), and they are
     // easy to save in localStorage.
     favorites: [],
+    // IDs of favorites added since the user last opened the favorites page.
+    // Only used for the badge in the menu ("something new here"), so it is
+    // NOT saved in localStorage: after a reload, nothing is "new" anymore.
+    unseenFavorites: [],
   }),
 
   getters: {
@@ -278,10 +282,21 @@ export const useDealsStore = defineStore('deals', {
       if (this.isFavorite(id)) {
         // filter() keeps every id EXCEPT this one -> removed
         this.favorites = this.favorites.filter(favoriteId => favoriteId !== id)
+        // If it was a new, unseen favorite, it isn't "new" anymore either
+        this.unseenFavorites = this.unseenFavorites.filter(favoriteId => favoriteId !== id)
       } else {
         this.favorites.push(id)
+        this.unseenFavorites.push(id)
       }
       this.saveFavorites()
+    },
+
+    /**
+     * Called when the user opens the favorites page: they have now SEEN the
+     * new favorites, so the badge in the menu disappears.
+     */
+    markFavoritesSeen () {
+      this.unseenFavorites = []
     },
 
     /**

@@ -28,12 +28,14 @@
         <span class="d-none d-sm-inline">Deals</span>
       </v-btn>
       <v-btn class="mr-2" to="/favorites">
-        <!-- Badge = small bubble with the number of favorites.
-             :model-value hides it when there are none. -->
+        <!-- Badge = small bubble with the number of NEW favorites, added
+             since the favorites page was last opened. It's a "something new"
+             signal, not a total (the favorites page shows the total).
+             :model-value hides it when there's nothing new. -->
         <v-badge
           color="red"
-          :content="dealsStore.favorites.length"
-          :model-value="dealsStore.favorites.length > 0"
+          :content="dealsStore.unseenFavorites.length"
+          :model-value="dealsStore.unseenFavorites.length > 0"
         >
           <v-icon icon="mdi-heart-outline" />
         </v-badge>
@@ -52,7 +54,7 @@
 <script setup>
   import { useDealsStore } from '@/stores/deals'
 
-  // Used for the number of favorites in the menu's badge
+  // Used for the number of new favorites in the menu's badge
   const dealsStore = useDealsStore()
 </script>
 

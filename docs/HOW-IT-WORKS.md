@@ -555,6 +555,8 @@ the app.
 | action | `saveFavorites()` | write to localStorage |
 | action | `loadFavorites()` | read from localStorage |
 | action | `init()` | `loadFavorites()` then `fetchDeals()`, called once in `App.vue` |
+| state | `unseenFavorites` | IDs added since the favorites page was last opened (menu badge) |
+| action | `markFavoritesSeen()` | empties `unseenFavorites`, called when the favorites page opens |
 
 **`getFavorites` filters out `undefined`:** `ids.map(id => deals.find(...))`
 gives `undefined` when a favorite's deal isn't in the current data (offline
@@ -605,8 +607,19 @@ every card showing that deal updates by itself.
 
 The top bar now has two buttons: **Deals** (`to="/"`, `exact` so it's only
 highlighted on `/` itself, since every path starts with `/`) and **Favorites**
-(`to="/favorites"`) with a `v-badge` showing how many favorites there are
-(hidden at 0). On phones only the icons are shown (`d-none d-sm-inline` on the
+(`to="/favorites"`) with a `v-badge`.
+
+**The badge is temporary.** It shows how many favorites were added *since the
+favorites page was last opened*, like a "new" notification, not the total (the
+favorites page already shows the total above the cards; a permanent count
+looked like an unread notification).
+- `toggleFavorite()` pushes the ID into `unseenFavorites` when adding, and
+  removes it from there too when removing (so un-hearting a new favorite takes
+  it off the badge, while removing an older one doesn't change it).
+- `pages/favorites.vue` calls `markFavoritesSeen()` in `onMounted`: opening the
+  page empties the list and the badge disappears.
+- `unseenFavorites` is deliberately **not** saved in localStorage: after a
+  reload nothing counts as new anymore. On phones only the icons are shown (`d-none d-sm-inline` on the
 text). The deal page also has an "Add to favorites" / "In favorites" button.
 
 ### Questions a teacher might ask (step 5)

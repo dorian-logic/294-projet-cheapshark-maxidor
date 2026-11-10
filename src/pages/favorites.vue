@@ -74,11 +74,17 @@
 </template>
 
 <script setup>
-  import { computed } from 'vue'
+  import { computed, onMounted } from 'vue'
   import { useDealsStore } from '@/stores/deals'
   import { plural } from '@/utils/format'
 
   const dealsStore = useDealsStore()
+
+  // Opening this page = the user has seen their new favorites:
+  // the badge in the menu goes away.
+  onMounted(() => {
+    dealsStore.markFavoritesSeen()
+  })
 
   // Saved IDs minus the deals actually found = favorites we can't display.
   const hiddenCount = computed(() =>
