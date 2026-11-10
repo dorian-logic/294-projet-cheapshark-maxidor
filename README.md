@@ -184,6 +184,10 @@ behind each technical choice, step by step. (Also available as
 - Step 4: names aligned with the course, styling (section 9)
 - Step 5: favorites with localStorage, store init() in App.vue (section 10)
 - Step 6: visual polish: theme colours, card layout, compact filters (section 11)
+- Step 7: code aligned with the course, sequences 1 to 5 (section 12: checklist → file)
+
+Sections 1 to 6 describe the code **as it is now**; sections 7 to 11 explain
+what each later step added and why.
 
 (Step 2 first showed the details in a dialog. Step 3 replaced it with a real
 page per deal, as recommended in class.)
@@ -235,59 +239,69 @@ Things the API **cannot** do, and which shaped the design:
 
 ```
 src/
-├── plugins/axios.js        Talks to the API (axios). Nothing else does.
-├── stores/deals.js         Pinia store: the data + filters + filtering/sorting logic
+├── App.vue                 Root component: calls dealsStore.init() once (onMounted)
+├── plugins/axios.js        The configured axios instance `api` (base URL from .env)
+├── stores/deals.js         Pinia store: deals, stores, favorites, filters + actions
 ├── data/fallback-data.json Saved sample deals, shown when the API is down
-├── utils/format.js         Price/date formatting shared by several components
+├── utils/format.js         Price/date/score formatting shared by several components
 ├── components/
+│   ├── AppHeader.vue       Top bar + menu (menuItems array, v-btn :to)
+│   ├── AppFooter.vue       Footer with a default <slot>
 │   ├── DealFilters.vue     The filter bar (writes into the store)
-│   ├── DealCard.vue        One deal card (props in), a link to its detail page
-│   └── AppFooter.vue       Footer
-├── layouts/default.vue     Top bar + <router-view> + footer around every page
+│   └── DealCard.vue        One deal card (props in), link to its page, heart button
+├── layouts/default.vue     AppHeader + <router-view> + AppFooter + the snackbar
 ├── router/index.js         Creates the router (routes generated from src/pages/)
 └── pages/                  One file = one page (file-based routing)
-    ├── index.vue           "/"            the list: loading / error / empty / cards + pagination
+    ├── index.vue           "/"            the list: chained computed, skeletons, pagination
     ├── deals/[id].vue      "/deals/:id"   the detail page of one deal
+    ├── favorites.vue       "/favorites"   the favorite deals
+    ├── about.vue           "/about"       what the app is
     └── [...path].vue       anything else  "Page not found" (404)
 scripts/update-fallback.mjs Node script that refreshes the fallback data from the API
 ```
 
 Each layer has **one responsibility** ("separation of concerns"):
 
-| Layer | Knows about HTTP? | Knows about the screen? |
-|---|---|---|
-| `plugins/axios.js` | yes | no |
-| `stores/deals.js` | no (calls the service) | no |
-| components / page | no | yes |
+| Layer | Knows the API's address? | Talks to the API? | Knows about the screen? |
+|---|---|---|---|
+| `plugins/axios.js` | yes | creates `api` | no |
+| `stores/deals.js` | no | yes, with `api.get()` | no |
+| components / pages | no | no (they use the store) | yes |
 
-So if the API changes, only `api.js` changes. If the design changes, only the
-components change.
+If the API's address changes, only `.env` changes. If the design changes,
+only the components change.
 
 ---
 
 ### 3. Data flow
 
-**At start-up**
+**At start-up** (whatever page is opened first)
 
 ```
-App.vue  onMounted()                         (since step 5; before: each page)
+App.vue  onMounted()
    └─> dealsStore.init()
-         ├─> loadFavorites()                  (localStorage, instant)
-         └─> fetchDeals()                     (action)
-         ├─> isLoading = true
-         ├─> fetchAllDeals() + fetchStores()  (service, in parallel)
-         │      └─> GET /deals?page=1 ... page=5, GET /stores
-         ├─> deals = [...500 deals], stores = [...]
-         └─> isLoading = false   (in `finally`, also on error)
+         ├─> loadFavorites()                       localStorage, instant
+         └─> Promise.all([ fetchDeals(), fetchStores() ])   in parallel
+               fetchDeals():  isLoading = true
+                              api.get('/deals', page 1)  → pagination.pages = 5
+                              api.get('/deals', pages 2..5) in parallel (Promise.all)
+                              deals = [...500 deals]
+                              (error → fallback sample deals, usingFallback = true)
+                              isLoading = false   (in `finally`, also on error)
+               fetchStores(): api.get('/stores') → stores (logos)
 ```
+
+Pages show **skeletons** while `isLoading` is true, then the data.
 
 **When the user changes a filter**
 
 ```
 user types "batman" in DealFilters
    └─> v-model writes dealsStore.filters.search
-         └─> getter filteredDeals is recalculated automatically
-               └─> index.vue (which displays filteredDeals) re-renders
+         └─> index.vue's chained computed recalculate by themselves:
+             deals → filteredByStore → filteredByPrice → filteredByDiscount
+                   → filteredBySearch → sortedDeals → visibleDeals
+               └─> the grid re-renders
                └─> watch(filters) puts the list back on page 1
 ```
 
@@ -302,100 +316,103 @@ No function is called by hand to "apply" the filters: this is Vue's
 #### `plugins/axios.js`
 
 - **`axios.create({ baseURL, timeout })`** builds a pre-configured axios
-  instance. Every call (`api.get('/deals')`) automatically gets the base URL
-  and the timeout, so they are written once.
-- **`params: { page, limit }`**: axios builds the query string
-  `?page=1&limit=100` for us (and encodes special characters).
-- **`fetchAllDeals()` downloads all 500 deals.** Why? Because the API can't
-  sort or do "less than / greater than" filters, the browser has to do it, and
-  for that it needs all the data. 500 small objects is a small download.
-  1. Load page 1 → read `pagination.pages` (= 5). We never hard-code "5",
-     so it still works if the number of deals changes.
-  2. Start pages 2 to 5 **at the same time** and wait for all of them with
-     `Promise.all` (faster than 4 requests one after the other).
-  3. `flatMap(page => page.data)` merges `[[...], [...], ...]` into one array.
-- **`toImageUrl(path)`** turns `/images/x.webp` into
-  `https://apis.divtec.me/images/x.webp`. Without it the browser would look
-  for the image on *our* server (`localhost:3000/images/...`) and fail.
+  instance, exported as `export default api`. Every call (`api.get('/deals')`)
+  automatically gets the base URL and the timeout, so they are written once.
 - **`import.meta.env.VITE_API_URL`**: Vite reads the `.env` file and
   exposes variables starting with `VITE_`. The `||` fallback means the app
-  still works when `.env` doesn't exist (fresh clone, GitHub Pages).
+  still works when `.env` doesn't exist (fresh clone, Vercel).
+- **`toImageUrl(path)`** turns `/images/x.webp` into
+  `https://apis.divtec.me/images/x.webp`. Without it the browser would look
+  for the image on *our* server (`localhost:3000/images/...`) and fail. It
+  lives here because it depends on the API's address.
 
 #### `stores/deals.js` (Pinia, "options" syntax)
 
 | Part | Contains | Comparable to |
 |---|---|---|
-| `state` | `deals`, `stores`, `isLoading`, `error`, `filters` | `data()` |
-| `getters` | `storeNames`, `storeLogo`, `filteredDeals` | `computed` |
-| `actions` | `fetchDeals()`, `resetFilters()` | `methods` |
+| `state` | `deals`, `stores`, `isLoading`, `error`, `usingFallback`, `filters`, `currentPage`, `favorites`, `unseenFavorites`, `snackbar` | `data()` |
+| `getters` | counters `totalDeals`, `totalFavorites`; with a parameter `getDealById(id)`, `isFavorite(id)`, `storeLogo(name)`; `getFavorites`, `storeNames`, `hasActiveFilters` | `computed` |
+| `actions` | `init()`, `fetchDeals()`, `fetchStores()`, `toggleFavorite()`, `saveFavorites()`, `loadFavorites()`, `markFavoritesSeen()`, `notify()`, `resetFilters()`, `filterByStore()`, `setSortBy()`, `toggleSortOrder()` | `methods` |
 
-- **Why a store?** The filter bar *writes* the filters and the page *reads* the
-  result. Both need the same data. The store is one shared instance:
-  every `useDealsStore()` call returns the same object.
-- **`filteredDeals`** is the heart of the app:
-  1. `filter()` keeps a deal only if it passes **all** active filters
-     (an empty filter = ignored).
-  2. `toSorted(SORTERS[sortBy])` sorts a **copy**, so `state.deals` is never
-     modified.
-  Getters are **cached**: it only recalculates when `deals` or `filters` change.
-- **Compare functions** (`SORTERS`): `sort/toSorted` call `(a, b)`;
-  a negative result puts `a` first. `b.x - a.x` = biggest first,
-  `a.x - b.x` = smallest first. Dates `"YYYY-MM-DD"` sort correctly as text,
-  so `localeCompare` is enough.
-- **`?? 0`** (nullish coalescing): "use 0 if the value is `null`/`undefined`".
-  Needed because some deals don't have a score or date.
-  (`||` would also replace a real `0`, which `??` doesn't.)
-- **`storeLogo` returns a function**: that's how a Pinia getter takes a
-  parameter (`storeLogo('Steam')`).
+- **Why a store?** The filter bar *writes* the filters and the page *reads*
+  them; the cards, the menu and the favorites page all read the favorites.
+  The store is one shared instance: every `useDealsStore()` call returns the
+  same object, and its data survives page changes.
+- **`fetchDeals()` downloads all 500 deals** with `api.get()`. Why all?
+  The API can't sort or do "less than / greater than" filters, so the browser
+  has to, and for that it needs all the data (500 small objects).
+  1. `api.get('/deals', { params: { page: 1, limit: 100 } })`; axios builds
+     the query string `?page=1&limit=100`, and puts the JSON in
+     `response.data`. Its `pagination.pages` (= 5) says how many pages exist:
+     never hard-coded.
+  2. Pages 2 to 5 are requested **at the same time** and awaited with
+     `Promise.all` (faster than one after the other).
+  3. `flatMap(response => response.data.data)` merges the pages into one array.
+- **`try / catch / finally`** in `fetchDeals()`:
+  - `catch`: a readable message in `error`, and the sample deals (fallback).
+    `error.response` exists → the server answered with an error code (404,
+    500…); it doesn't → the server was never reached (offline, timeout).
+  - `finally` always runs → `isLoading` always goes back to `false`.
+  - Guards: already loaded → no new download; already loading → no second one.
+- **Getters with a parameter return a function**: `getDealById: state => id => ...`.
+  That's how a Pinia getter takes a parameter (`getDealById(12)`).
 - **`createDefaultFilters()` is a function**, not a constant object: each reset
   gets a brand-new object, so the default values can never be modified by
   accident.
-- **`fetchDeals()`** uses `try / catch / finally`:
-  - `try`: download. `catch`: save a readable message in `error`.
-  - `error.response` exists → the server answered with an error code (404,
-    500…). It doesn't exist → the server was never reached (offline, timeout).
-  - `finally` always runs → the spinner always stops, even after an error.
-  - The guard `if (this.deals.length > 0) return` avoids downloading again.
+- **`?? 0`** (nullish coalescing): "use 0 if the value is `null`/`undefined`".
+  Needed because some deals don't have a score or date.
+  (`||` would also replace a real `0`, which `??` doesn't.)
 
 #### `components/DealFilters.vue`
 
-- Each field uses **`v-model="dealsStore.filters.xxx"`**: two-way binding
-  directly on the store. Typing updates the store; resetting the store
-  updates the fields.
+- Search, store, max price and minimum discount use
+  **`v-model="dealsStore.filters.xxx"`**: two-way binding directly on the store.
 - Max price uses a **fixed list** instead of a free text field → no invalid
   input to validate. Clearing it sets `null` = no limit.
+- **Sort = criterion + direction.** The `v-select` picks the criterion
+  (`setSortBy()` also resets the direction to the natural one: price →
+  cheapest first, scores → highest first, name → A→Z). The **toggle button**
+  (`toggleSortOrder()`) switches ascending ↔ descending; its text says what the
+  current order means ("Cheapest first", "Z → A"...).
 
 #### `components/DealCard.vue`
 
-- A **presentational** component: it only receives data through **props**
-  (`deal`, `storeLogo`) and displays it. It doesn't know where the data comes
-  from → reusable anywhere.
-- Props are declared with `type` and `required`, so Vue warns in the console
-  if they are used wrongly.
-- Prices and dates are formatted by `utils/format.js` (since step 2):
+- Receives the deal through **props** (`deal`, `storeLogo`), declared with
+  `type` and `required`, so Vue warns in the console if they are used wrongly.
+- The card is a **link** (`:to="/deals/12"`). The heart button inside it uses
+  `@click.stop.prevent` (see section 10) and the store's `isFavorite()` /
+  `toggleFavorite()`, then `notify()` for the snackbar.
+- Prices, dates and score colours come from `utils/format.js`:
   `Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })` is the
   built-in JavaScript way to format money (`4.99` → `$4.99`).
 - `v-if` on each score chip: no chip when the API didn't provide the value.
-- `formatYear()` uses `isoDate?.slice(0, 4)`: `?.` (optional chaining) stops and returns
-  `undefined` instead of crashing when `releaseDate` is missing.
 
 #### `pages/index.vue`
 
-- The deals are loaded by `dealsStore.init()` in `App.vue` (since step 5),
-  not by this page: the page only displays the store's state.
-- **Four exclusive states** with `v-if / v-else-if / v-else`: loading → error
-  (with *Retry*) → no results (with *Reset filters*) → list. A user is
-  never left in front of an empty screen without explanation.
+- **`storeToRefs(dealsStore)`** gives refs (`deals`, `filters`, `isLoading`...)
+  that stay linked to the store when destructured. A plain
+  `const { deals } = dealsStore` would copy the value once and lose reactivity.
+  Actions are not destructured: they're called on `dealsStore`.
+- **Chained computed** (the course's sequence 4 pipeline):
+  `filteredByStore → filteredByPrice → filteredByDiscount → filteredBySearch →
+  sortedDeals → visibleDeals`. Each takes the previous result; each only
+  recalculates when what it reads changes. `filter()` and `toSorted()` return
+  new arrays: the store's `deals` are **never modified**.
+- **Search** is case-insensitive: `title.toLowerCase().includes(query.toLowerCase())`.
+- **Sort**: one compare function for all criteria. It returns `< 0` (a first),
+  `> 0` (b first) or `0`; text uses `localeCompare()`, numbers a subtraction;
+  `direction * comparison` with `direction = -1` reverses the order. Deals
+  without the value (no score, no date) always go to the end.
+- **Four exclusive states** with `v-if / v-else-if / v-else`: loading
+  (`v-skeleton-loader` × 8, same grid as the cards) → error (with *Retry*) →
+  no results (with *Reset filters*) → list.
 - **Client-side pagination**: 24 cards per page.
-  - `pageCount = Math.ceil(total / 24)` (rounded **up**: 25 deals = 2 pages).
-  - `visibleDeals = filteredDeals.slice(start, start + 24)` with
-    `start = (page - 1) * 24`.
-  - `currentPage` lives in the **store** (since step 3): the list page is
-    destroyed when you open a deal, so a local variable would reset to page 1
-    every time you come back.
-- **`watch(() => dealsStore.filters, ..., { deep: true })`** goes back to
-  page 1 whenever a filter changes, otherwise you could be on page 5 of a
-  result that only has 1 page. `deep: true` = also detect changes *inside* the
+  `pageCount = Math.ceil(total / 24)` (rounded **up**: 25 deals = 2 pages);
+  `visibleDeals = sortedDeals.slice(start, start + 24)` with
+  `start = (page - 1) * 24`. `currentPage` lives in the store so it survives
+  opening a deal and coming back.
+- **`watch(filters, ..., { deep: true })`** goes back to page 1 whenever a
+  filter or the sort changes. `deep: true` = also detect changes *inside* the
   object (e.g. only `filters.search` changed).
 - `:key="deal.id"` on `v-for` lets Vue track each card when the list is
   re-ordered, instead of re-creating everything.
@@ -418,16 +435,19 @@ run in parallel. Total time ≈ the slowest request, not the sum of all.
 **Getter vs action?** A getter *computes* a value from the state (no side
 effects, cached). An action *changes* the state and can be `async`.
 
-**Props vs store?** `DealCard` uses props because it just displays what it's
-given (reusable). `DealFilters` uses the store because its job is precisely to
-change shared state.
+**Props vs store?** `DealCard` receives the deal through props (the parent
+decides which deal), so it's reusable on the list and the favorites page.
+`DealFilters` uses the store because its job is precisely to change shared
+state.
 
-**What happens if the API is down?** The `catch` stores a message, the page
-shows a red alert with a *Retry* button that calls `fetchDeals()` again.
+**What happens if the API is down?** The `catch` stores a message and loads
+the sample deals; the page shows an orange warning with a *Retry* button that
+calls `fetchDeals()` again.
 
-**Why `toSorted()` and not `sort()`?** `sort()` modifies the array in place;
-in a store that could change `state.deals` by accident. `toSorted()` returns a
-new sorted array. (The project's ESLint config also requires it.)
+**Why `toSorted()` and not `sort()`?** `sort()` modifies the array in place,
+which could change the store's `deals` by accident. `toSorted()` returns a new
+sorted array; it does the same as the course's `[...array].sort()` (copy,
+then sort). The project's ESLint config also requires it.
 
 **Why is `.env` not committed?** Convention: `.env` holds local settings
 (and secrets in other projects). `.env.example` is committed to show which
@@ -550,7 +570,7 @@ URL /deals/12
    immediately.
 2. **Directly** (bookmark, shared link, F5 on the page): the app has just
    started, the store is **empty**. `init()` in `App.vue` is loading it, the page
-   shows a spinner (`dealsStore.isLoading`), and when the data arrives `deal`
+   shows a skeleton (`dealsStore.isLoading`), and when the data arrives `deal`
    recalculates **by itself** and the page appears. No `await`, no manual
    refresh: reactivity does it.
 
@@ -646,7 +666,7 @@ return to the previous one.
 
 | Before | Now (course convention) |
 |---|---|
-| `src/services/api.js` | `src/plugins/axios.js` (the shared axios instance + API functions) |
+| `src/services/api.js` | `src/plugins/axios.js` (the shared axios instance; since step 7 the store calls `api.get()` itself) |
 | `.env`: `VITE_API_BASE_URL` | `VITE_API_URL` |
 | store state `loading` | `isLoading` |
 | store getter `dealById(id)` | `getDealById(id)` |
@@ -732,14 +752,17 @@ the app.
 | action | `toggleFavorite(id)` | add if absent, remove if present, then save |
 | action | `saveFavorites()` | write to localStorage |
 | action | `loadFavorites()` | read from localStorage |
-| action | `init()` | `loadFavorites()` then `fetchDeals()`, called once in `App.vue` |
+| getter | `totalFavorites` | number of favorites (counter, shown in the page title) |
+| action | `init()` | `loadFavorites()` then `fetchDeals()` + `fetchStores()` in parallel, called once in `App.vue` |
+| action | `notify(text)` | shows "Added to favorites" / "Removed from favorites" in the snackbar |
 | state | `unseenFavorites` | IDs added since the favorites page was last opened (menu badge) |
 | action | `markFavoritesSeen()` | empties `unseenFavorites`, called when the favorites page opens |
 
 **`getFavorites` filters out `undefined`:** `ids.map(id => deals.find(...))`
 gives `undefined` when a favorite's deal isn't in the current data (offline
-with only the sample deals, or no longer on sale). `.filter(Boolean)` removes
-those, so the page never tries to display `undefined`. The favorites page shows
+with only the sample deals, or no longer on sale).
+`.filter(deal => deal !== undefined)` removes those, so the page never tries
+to display `undefined`. The favorites page shows
 how many were hidden.
 
 **The toggle pattern:** one action, two effects. `isFavorite(id)` decides:
@@ -751,7 +774,7 @@ already there → `filter()` keeps every ID except this one; not there →
 `App.vue` is mounted once when the app starts and never destroyed, whatever
 page the user opens first. So it's the right place to prepare the store once:
 `onMounted(() => dealsStore.init())`. The pages no longer call
-`fetchDeals()` themselves; they only display the store's state (spinner while
+`fetchDeals()` themselves; they only display the store's state (skeletons while
 `isLoading`, then the data).
 
 #### The heart button (`DealCard.vue`)
@@ -929,3 +952,87 @@ reports were false alarms, and the code was adjusted so the checks pass:
 - A real one, fixed: ESLint's `perfectionist/sort-imports` rule wants imports
   in a fixed order (packages before side-effect imports like CSS files).
   `npx eslint --fix <file>` reorders them automatically.
+
+---
+
+### 12. Step 7: checklist of the course (sequences 1 to 5) → where it is
+
+Each line is an item of the "projet perso" checklists on devjs.ch
+(E5, E8, E11, E14, E17) and the place in this project that fulfils it.
+
+#### Sequence 1: components, pages, navigation (E1 to E5)
+
+| Checklist item | Where |
+|---|---|
+| Data loaded from the API | `stores/deals.js` → `fetchDeals()` (sequence 2 moved the loading from the page to the store) |
+| ≥ 3 components, incl. a card with `defineProps` | `DealCard.vue` (`defineProps({ deal: { type: Object, required: true } ... })`), `DealFilters.vue`, `AppHeader.vue`, `AppFooter.vue` |
+| Slot | `AppFooter.vue`: default `<slot>` with fallback content (the year + data source) |
+| ≥ 3 pages with working navigation | `pages/index.vue` (`/`), `favorites.vue` (`/favorites`), `about.vue` (`/about`), `deals/[id].vue`, `[...path].vue` (404) |
+| Menu: `v-btn :to` in the header | `AppHeader.vue`: `menuItems` array + `v-for` of `v-btn :to="item.path"` |
+| Dynamic route `/item/:id` + detail page | `pages/deals/[id].vue` → `/deals/:id`, reads `route.params.id` |
+| Back button on the detail page | `[id].vue` → `goBack()`: `router.back()` (or `push('/')` if opened directly) |
+| Footer | `AppFooter.vue`, included by `layouts/default.vue` |
+| Pushed to GitHub, deployed online | GitHub repo + Vercel (`vercel.json` rewrites, section 8) |
+
+#### Sequence 2: Pinia (E6 to E8)
+
+| Checklist item | Where |
+|---|---|
+| Store in `src/stores/` with `defineStore()` | `stores/deals.js` → `useDealsStore` (options syntax) |
+| State with the main data (list, categories, `isLoading`) | `deals`, `stores`, `isLoading` (+ filters, favorites...) |
+| ≥ 1 simple getter (counter) | `totalDeals`, `totalFavorites` |
+| ≥ 1 getter with a parameter | `getDealById(id)` (also `isFavorite(id)`, `storeLogo(name)`) |
+| ≥ 1 async action that calls the API | `fetchDeals()`, `fetchStores()` |
+| `init()` called in `App.vue` (`onMounted`) | `App.vue`: `onMounted(() => dealsStore.init())` |
+| List page connected to the store (no local fetch) | `pages/index.vue`: `storeToRefs(dealsStore)`, no `fetch`/`onMounted` |
+| Detail page uses a store getter | `[id].vue`: `dealsStore.getDealById(dealId.value)` |
+
+#### Sequence 3: Axios + .env (E9 to E11)
+
+| Checklist item | Where |
+|---|---|
+| Axios instance in `src/plugins/axios.js` | `export default api` (`axios.create({ baseURL, timeout })`) |
+| `VITE_API_URL` in `.env`, `.env.example` committed, `.env` ignored | `.env.example`, `.gitignore` |
+| The store uses `api.get()` | `fetchDeals()`: `api.get('/deals', { params })`, `fetchStores()`: `api.get('/stores')` |
+| Skeletons while loading | `v-skeleton-loader` × 8 (`type="image, article"`, same grid) in `index.vue`; also `favorites.vue`, `[id].vue` |
+| Alert when the API doesn't respond | `index.vue`: warning `v-alert` + Retry (and the sample deals, see section 7) |
+
+#### Sequence 4: search, filter, sort (E12 to E14)
+
+| Checklist item | Where |
+|---|---|
+| Search field with `v-model`, real time | `DealFilters.vue`: `v-text-field v-model="dealsStore.filters.search"` |
+| Search `computed`, case-insensitive (`toLowerCase`) | `index.vue` → `filteredBySearch` |
+| Category filter with `v-select` | `DealFilters.vue`: store `v-select` (+ max price, min discount) |
+| Sort with a toggle button (asc/desc) | `DealFilters.vue`: toggle button → `toggleSortOrder()`; `index.vue` → `sortedDeals` |
+| Chained computed (data → filter → search → sort) | `index.vue`: `filteredByStore → filteredByPrice → filteredByDiscount → filteredBySearch → sortedDeals` |
+| "No results" message | `index.vue`: `v-alert` "No deal found" + Reset filters |
+| Store data never modified | `filter()` / `toSorted()` return new arrays |
+
+#### Sequence 5: favorites (E15 to E17)
+
+| Checklist item | Where |
+|---|---|
+| `favorites` state = array of IDs | `stores/deals.js` → `favorites: []` |
+| `toggleFavorite()` | adds or removes the ID, then `saveFavorites()` |
+| `saveFavorites()` → localStorage | `JSON.stringify`, key `cheapshark-favorites`, in `try/catch` |
+| `loadFavorites()` called in `init()` | first line of `init()` |
+| `isFavorite()` getter changes the button | `DealCard.vue` heart icon/colour, `[id].vue` button |
+| `getFavorites` returns full objects | IDs → deals with `find()`, then `.filter(deal => deal !== undefined)` |
+| Favorite button with `@click.stop.prevent` | `DealCard.vue` heart (the card is a link) |
+| Favorites page with a "no favorites" message | `pages/favorites.vue`: `v-alert` "No favorites yet" when `totalFavorites === 0` |
+| Persists after reload | localStorage, read by `loadFavorites()` at start-up |
+| Card reused on home AND favorites | `<DealCard>` in `index.vue` and `favorites.vue` |
+| (E16) Snackbar "added / removed" | one `v-snackbar` in `layouts/default.vue`, text set by `dealsStore.notify()` |
+
+#### Where the project deliberately differs from the Pokédex, and why
+
+| Pokédex | This project | Why |
+|---|---|---|
+| Search/filter/sort refs in `index.vue` | `filters` in the store, computed in `index.vue` | The filters survive opening a deal and pressing Back (the page component is destroyed meanwhile) |
+| `isFavorite(pokemon)`, `toggleFavorite(pokemon)` take the object | take the **ID** | The favorites ARE IDs; the ID is all the function needs |
+| `cleanupFavorites()` removes IDs of unknown items | not used | Offline, only 17 sample deals are loaded: cleaning would delete the user's real favorites |
+| `init()`: data first, then `loadFavorites()` | `loadFavorites()` first, then the data | It's instant; this way the hearts are already right when the cards appear (no moment with empty favorites) |
+| Snackbar inside each card | one snackbar in the layout | Removing a favorite on the favorites page removes the card, and a snackbar inside it would vanish with it |
+| Sort icon `mdi-sort-alphabetical-*` | button with text ("Cheapest first", "A → Z") | Most criteria are numbers, an A→Z icon wouldn't say what the order is |
+| No mock fallback | sample deals when the API is down | The page stays usable offline (section 7) |

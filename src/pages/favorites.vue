@@ -11,24 +11,32 @@
 -->
 <template>
   <v-container>
+    <!-- totalFavorites: simple getter of the store (a counter) -->
     <h1 class="text-h4 font-weight-bold mt-6 mb-1">
-      Favorites
+      Favorites ({{ dealsStore.totalFavorites }})
     </h1>
     <p class="text-medium-emphasis mb-6">
       Deals you marked with the heart, saved in this browser.
     </p>
 
-    <!-- 1. LOADING (direct visit to /favorites: the deals aren't there yet) -->
-    <div v-if="dealsStore.isLoading" class="text-center py-12">
-      <v-progress-circular color="primary" indeterminate size="48" />
-      <p class="mt-4 text-medium-emphasis">
-        Loading deals...
-      </p>
-    </div>
+    <!-- 1. LOADING (direct visit to /favorites: the deals aren't there yet):
+         skeleton cards, one per saved favorite (at least 1, at most 8) -->
+    <v-row v-if="dealsStore.isLoading">
+      <v-col
+        v-for="n in Math.min(Math.max(dealsStore.totalFavorites, 1), 8)"
+        :key="n"
+        cols="12"
+        lg="3"
+        md="4"
+        sm="6"
+      >
+        <v-skeleton-loader class="rounded-lg" height="320" type="image, article" />
+      </v-col>
+    </v-row>
 
-    <!-- 2. NO FAVORITES: v-if / v-else on the length of the saved IDs -->
+    <!-- 2. NO FAVORITES: v-if / v-else on the number of saved IDs -->
     <v-alert
-      v-else-if="dealsStore.favorites.length === 0"
+      v-else-if="dealsStore.totalFavorites === 0"
       icon="mdi-heart-outline"
       title="No favorites yet"
       type="info"
@@ -75,6 +83,7 @@
 
 <script setup>
   import { computed, onMounted } from 'vue'
+  import DealCard from '@/components/DealCard.vue'
   import { useDealsStore } from '@/stores/deals'
   import { plural } from '@/utils/format'
 
@@ -88,6 +97,6 @@
 
   // Saved IDs minus the deals actually found = favorites we can't display.
   const hiddenCount = computed(() =>
-    dealsStore.favorites.length - dealsStore.getFavorites.length,
+    dealsStore.totalFavorites - dealsStore.getFavorites.length,
   )
 </script>

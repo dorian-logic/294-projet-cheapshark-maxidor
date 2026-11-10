@@ -58,7 +58,7 @@
         :icon="isFavorite ? 'mdi-heart' : 'mdi-heart-outline'"
         size="small"
         variant="text"
-        @click.stop.prevent="dealsStore.toggleFavorite(deal.id)"
+        @click.stop.prevent="handleToggleFavorite"
       />
 
       <!-- Discount badge, top-right. Not shown for free games: their price
@@ -181,6 +181,14 @@
   const isFavorite = computed(() => dealsStore.isFavorite(props.deal.id))
 
   const isFree = computed(() => props.deal.salePrice === 0)
+
+  // Heart click: add/remove the favorite, then confirm with a short message.
+  // After toggleFavorite(), isFavorite is already updated, so it tells us
+  // which of the two happened.
+  function handleToggleFavorite () {
+    dealsStore.toggleFavorite(props.deal.id)
+    dealsStore.notify(isFavorite.value ? 'Added to favorites' : 'Removed from favorites')
+  }
 </script>
 
 <!--

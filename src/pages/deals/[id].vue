@@ -29,13 +29,13 @@
       Back to deals
     </v-btn>
 
-    <!-- 1. LOADING (direct visit: the data isn't there yet) -->
-    <div v-if="dealsStore.isLoading" class="text-center py-12">
-      <v-progress-circular color="primary" indeterminate size="48" />
-      <p class="mt-4 text-medium-emphasis">
-        Loading deal...
-      </p>
-    </div>
+    <!-- 1. LOADING (direct visit: the data isn't there yet): a skeleton
+         (grey placeholder shapes) in the layout of the deal card -->
+    <v-skeleton-loader
+      v-if="dealsStore.isLoading"
+      class="rounded-lg"
+      type="image, heading, paragraph, actions"
+    />
 
     <!-- 2a. OFFLINE: the API is down and this deal isn't one of the saved
          sample deals. It probably exists; we just can't load it right now. -->
@@ -189,7 +189,7 @@
               :color="dealsStore.isFavorite(deal.id) ? 'red' : undefined"
               :prepend-icon="dealsStore.isFavorite(deal.id) ? 'mdi-heart' : 'mdi-heart-outline'"
               variant="tonal"
-              @click="dealsStore.toggleFavorite(deal.id)"
+              @click="handleToggleFavorite"
             >
               {{ dealsStore.isFavorite(deal.id) ? 'In favorites' : 'Add to favorites' }}
             </v-btn>
@@ -255,6 +255,13 @@
     } else {
       router.push('/')
     }
+  }
+
+  // Favorite button: add/remove, then confirm with a short message
+  // (same as the heart on the cards).
+  function handleToggleFavorite () {
+    dealsStore.toggleFavorite(deal.value.id)
+    dealsStore.notify(dealsStore.isFavorite(deal.value.id) ? 'Added to favorites' : 'Removed from favorites')
   }
 
   // "All deals from <store>": set the store filter, then go to the list.
