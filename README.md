@@ -118,21 +118,21 @@ Outils utiles : Figma / Draw.io / ...
 
 ### Utilisation détaillée
 **Domaines d'aide :**
-- Aide au code général : X%
-- Génération de snippets Vue/Vuetify : X%  
-- Aide à la structuration du projet : X%
-- Debugging : X%  
-- Recherche d’idées : X%  
+- Aide au code général : 60%
+- Génération de snippets Vue/Vuetify : 100%  
+- Aide à la structuration du projet : 30%
+- Debugging : 50%  
+- Recherche d’idées : 0%  
 
 **Compréhension et adaptation**
 - Expliquer ce que fait le code généré  
 - Dire comment il a été adapté au projet  
 
 ### Parties codées manuellement
-- Composants principaux : X% personnel  
-- Store & persistance : X% personnel  
-- Routing & navigation : X% personnel  
-- Tests & validation : 100% personnel  
+- Composants principaux : 30% personnel  
+- Store & persistance : 30% personnel  
+- Routing & navigation : 30% personnel  
+- Tests & validation : 50% personnel  
 
 ### Apprentissage personnel
 - Ce que j’ai appris grâce à l’IA  
